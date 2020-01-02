@@ -14,7 +14,7 @@ pipeline {
                 echo 'Executing build for : ${params.LIB_GIT_REPO} ${params.LIB_MAJOR_VERSION}:${BUILD_NUMBER}'
                 cd indy
                 mvn versions:set -DnewVersion=${params.LIB_MAJOR_VERSION}:rc${BUILD_NUMBER}
-                '"""
+                """
             }
         }
         stage('Build'){
