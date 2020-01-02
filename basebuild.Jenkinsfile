@@ -6,9 +6,11 @@ pipeline {
     agent { label 'maven' }
     stages {
         stage('git checkout') {
-            checkout([$class      : 'GitSCM', branches: [[name: params.INDY_GIT_BRANCH]], doGenerateSubmoduleConfigurations: false,
-                      extensions  : [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'indy'], [$class: 'CleanCheckout']],
-                      submoduleCfg: [], userRemoteConfigs: [[url: params.INDY_GIT_REPO]]])
+            steps{
+                checkout([$class      : 'GitSCM', branches: [[name: params.INDY_GIT_BRANCH]], doGenerateSubmoduleConfigurations: false,
+                          extensions  : [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'indy'], [$class: 'CleanCheckout']],
+                          submoduleCfg: [], userRemoteConfigs: [[url: params.INDY_GIT_REPO]]])
+            }
         }
         stage('Get Version'){
             steps{
