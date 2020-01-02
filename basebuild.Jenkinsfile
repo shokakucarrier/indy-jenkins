@@ -1,5 +1,3 @@
-def artifact_glob="deployments/launcher/target/*.tar.gz"
-def artifact="deployments/launcher/target/*-skinny.tar.gz"
 def data_artifact="deployments/launcher/target/*-data.tar.gz"
 
 def my_bc = null
@@ -34,7 +32,7 @@ pipeline {
         stage('Archive') {
             steps {
                 echo "Archive"
-                archiveArtifacts artifacts: "**/*-${params.INDY_MAJOR_VERSION}:rc${BUILD_NUMBER}*", fingerprint: true
+                archiveArtifacts artifacts: "**/*${params.INDY_MAJOR_VERSION}:rc${BUILD_NUMBER}*", fingerprint: true
             }
         }
         stage('Deploy') {
