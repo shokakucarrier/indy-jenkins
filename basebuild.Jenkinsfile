@@ -23,24 +23,32 @@ pipeline {
         }
         stage('Build'){
             steps{
-                sh "mvn -B -V clean verify"
+                dir("indy"){
+                    sh "mvn -B -V clean verify"
+                }
             }
         }
         stage('Function test'){
             steps {
-                sh 'mvn -B -V verify -Prun-its -Pci'
+                dir("indy"){
+                    sh 'mvn -B -V verify -Prun-its -Pci'
+                }
             }
         }
         stage('Archive') {
             steps {
-                echo "Archive"
-                archiveArtifacts artifacts: "**/*${params.INDY_MAJOR_VERSION}:rc${BUILD_NUMBER}*", fingerprint: true
+                dir(params.LIB_NAME){
+                    echo "Archive"
+                    archiveArtifacts artifacts: "**/*${params.INDY_MAJOR_VERSION}:rc${BUILD_NUMBER}*", fingerprint: true
+                }
             }
         }
         stage('Deploy') {
             steps {
                 echo "Deploy"
-                sh 'mvn help:effective-settings -B -V -DskipTests=true deploy -e'
+                dir("indy"){
+                    sh 'mvn help:effective-settings -B -V -DskipTests=true deploy -e'
+                }
             }
         }
         stage('Build & Push Image') {
