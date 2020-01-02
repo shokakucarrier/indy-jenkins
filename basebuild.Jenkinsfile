@@ -15,7 +15,7 @@ pipeline {
         stage('Get Version'){
             steps{
                 sh """# /bin/bash
-                ehco 'Executing build for : ${params.INDY_GIT_REPO} ${params.INDY_MAJOR_VERSION}:${BUILD_NUMBER}'
+                echo 'Executing build for : ${params.INDY_GIT_REPO} ${params.INDY_MAJOR_VERSION}:${BUILD_NUMBER}'
                 cd indy
                 mvn versions:set -DnewVersion=${params.INDY_MAJOR_VERSION}:rc${BUILD_NUMBER}
                 '"""
