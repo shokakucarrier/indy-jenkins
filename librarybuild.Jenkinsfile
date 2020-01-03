@@ -13,7 +13,7 @@ pipeline {
                 sh """# /bin/bash
                 echo 'Executing build for : ${params.LIB_GIT_REPO} ${params.LIB_MAJOR_VERSION}:${BUILD_NUMBER}'
                 cd ${params.LIB_NAME}
-                mvn versions:set -DnewVersion=${params.LIB_MAJOR_VERSION}:rc${BUILD_NUMBER}
+                mvn versions:set -DnewVersion=${params.LIB_MAJOR_VERSION}-rc${BUILD_NUMBER}
                 """
             }
         }
@@ -35,7 +35,7 @@ pipeline {
             steps {
                 dir(params.LIB_NAME){
                     echo "Archive"
-                    archiveArtifacts artifacts: "**/*${params.LIB_MAJOR_VERSION}:rc${BUILD_NUMBER}*", fingerprint: true
+                    archiveArtifacts artifacts: "**/*${params.LIB_MAJOR_VERSION}-rc${BUILD_NUMBER}*", fingerprint: true
                 }
             }
         }
