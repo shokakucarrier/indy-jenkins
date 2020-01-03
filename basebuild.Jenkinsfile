@@ -1,5 +1,8 @@
 def data_artifact="deployments/launcher/target/*-data.tar.gz"
+def artifact="deployments/launcher/target/*-skinny.tar.gz"
 
+def ocp_map = '/mnt/ocp/jenkins-openshift-mappings.json'
+def bc_section = 'build-configs'
 def my_bc = null
 
 pipeline {
@@ -46,6 +49,38 @@ pipeline {
                 echo "Deploy"
                 dir("indy"){
                     sh 'mvn help:effective-settings -B -V -DskipTests=true deploy -e'
+                }
+            }
+        }
+        stage('Load OCP Mappings') {
+            steps {
+                echo "Load OCP Mapping document"
+                script {
+                    def exists = fileExists ocp_map
+                    if (exists){
+                        def jsonObj = readJSON file: ocp_map
+                        if (bc_section in jsonObj){
+                            if (params.INDY_GIT_URL in jsonObj[bc_section]) {
+                                echo "Found BC for Git repo: ${params.INDY_GIT_URL}"
+                                if (params.INDY_GIT_BRANCH in jsonObj[bc_section][params.INDY_GIT_URL]) {
+                                    my_bc = jsonObj[bc_section][params.INDY_GIT_URL][params.INDY_GIT_BRANCH]
+                                } else {
+                                    my_bc = jsonObj[bc_section][params.INDY_GIT_URL]['default']
+                                }
+
+                                echo "Using BuildConfig: ${my_bc}"
+                            }
+                            else {
+                                echo "Git URL: ${params.INDY_GIT_URL} not found in BC mapping."
+                            }
+                        }
+                        else {
+                            "BC mapping is invalid! No ${bc_section} sub-object found!"
+                        }
+                    }
+                    else {
+                        echo "JSON configuration file not found: ${ocp_map}"
+                    }
                 }
             }
         }
