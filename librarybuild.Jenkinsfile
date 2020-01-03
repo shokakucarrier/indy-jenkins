@@ -33,10 +33,8 @@ pipeline {
         }
         stage('Archive') {
             steps {
-                dir(params.LIB_NAME){
-                    echo "Archive"
-                    archiveArtifacts artifacts: "**/*${params.LIB_MAJOR_VERSION}-rc${BUILD_NUMBER}*", fingerprint: true
-                }
+                echo "Archive"
+                archiveArtifacts artifacts: "**/*${params.LIB_MAJOR_VERSION}-rc${BUILD_NUMBER}*", fingerprint: true
             }
         }
         stage('Deploy') {
