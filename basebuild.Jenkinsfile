@@ -87,18 +87,20 @@ pipeline {
         stage('Build & Push Image') {
             steps {
                 script {
-                    def artifact_file = sh(script: "ls $artifact", returnStdout: true)?.trim()
-                    def tarball_url = "${BUILD_URL}artifact/$artifact_file"
-                    openshift.withCluster() {
-                        openshift.withProject() {
-                            echo "Starting image build: ${openshift.project()}:${my_bc}"
-                            def bc = openshift.selector("bc", my_bc)
+                    dir("indy"){
+                        def artifact_file = sh(script: "ls $artifact", returnStdout: true)?.trim()
+                        def tarball_url = "${BUILD_URL}artifact/$artifact_file"
+                        openshift.withCluster() {
+                            openshift.withProject() {
+                                echo "Starting image build: ${openshift.project()}:${my_bc}"
+                                def bc = openshift.selector("bc", my_bc)
 
-                            def data_artifact_file = sh(script: "ls $data_artifact", returnStdout: true)?.trim()
-                            def data_tarball_url = "${BUILD_URL}artifact/$data_artifact_file"
+                                def data_artifact_file = sh(script: "ls $data_artifact", returnStdout: true)?.trim()
+                                def data_tarball_url = "${BUILD_URL}artifact/$data_artifact_file"
                             
-                            def buildSel = bc.startBuild("-e tarball_url=${tarball_url} -e data_tarball_url=${data_tarball_url}")
-                            buildSel.logs("-f")
+                                def buildSel = bc.startBuild("-e tarball_url=${tarball_url} -e data_tarball_url=${data_tarball_url}")
+                                buildSel.logs("-f")
+                            }
                         }
                     }
                 }
