@@ -58,9 +58,16 @@ pipeline {
             steps{
                 script{
                     sh script: "cp /src/*.log $WORKSPACE"
+                    sh script: 'echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" >> combined.xml && \
+                    echo "<testResults version=\"1.2\">" >> combined.xml && \
+                    grep -vh "</\?testResults>\|<?xml\|<testResults" build-simulation-existing.jmx.log >> combined.xml && \
+                    grep -vh "</\?testResults>\|<?xml\|<testResults" upload-simulation-existing.jmx.log >> combined.xml && \
+                    grep -vh "</\?testResults>\|<?xml\|<testResults" download-simulation-existing.jmx.log >> combined.xml && \
+                    echo "</testResults>" >> combined.xml
+                    '
                 }
-                archiveArtifacts artifacts: "*.log"
-                perfReport "build-simulation-existing.log"
+                archiveArtifacts artifacts: "*.log,combined.xml"
+                perfReport "combined.log"
             }
         }
     }
