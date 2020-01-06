@@ -11,7 +11,7 @@ pipeline {
         stage('Get Version'){
             steps{
                 sh """# /bin/bash
-                echo 'Executing build for : ${params.LIB_GIT_REPO} ${params.LIB_MAJOR_VERSION}:${BUILD_NUMBER}'
+                echo 'Executing build for : ${params.LIB_GIT_REPO} ${params.LIB_MAJOR_VERSION}-rc${BUILD_NUMBER}'
                 cd ${params.LIB_NAME}
                 mvn versions:set -DnewVersion=${params.LIB_MAJOR_VERSION}-rc${BUILD_NUMBER}
                 """
