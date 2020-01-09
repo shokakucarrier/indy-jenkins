@@ -17,7 +17,7 @@ pipeline {
                         parameters:[
                             string(name: 'threads', defaultValue: '5', description: 'Jmeter treads'),
                             string(name: 'loops', defaultValue: '10', description: 'Script loops, controls running time'),
-                            string(name: 'url', defaultValue: 'indy-infra-nos-automation.cloud.paas.psi.redhat.com', description: 'Indy URL to test'),
+                            string(name: 'url', defaultValue: 'indy-perf-nos-automation.cloud.paas.psi.redhat.com', description: 'Indy URL to test'),
                             string(name: 'port', defaultValue: '80', description: 'Indy port to test')
                         ]
                     )
@@ -67,7 +67,7 @@ pipeline {
                     '
                 }
                 archiveArtifacts artifacts: "*.log,combined.xml"
-                perfReport "combined.log"
+                perfReport "combined.xml"
             }
         }
     }
