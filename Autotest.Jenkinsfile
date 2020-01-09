@@ -32,7 +32,7 @@ pipeline {
             steps {
                 script {
                     echo "Jmeter running build-simulation-existing"
-                    sh script: "THREADS=${inputThreads} HOSTNAME=${inputUrl} LOOPS=${inputLoops} PORT=${inputPort} /src/entrypoint.sh build-simulation-existing.jmx"
+                    sh script: "THREAD=${inputThreads} HOSTNAME=${inputUrl} LOOPS=${inputLoops} PORT=${inputPort} /src/entrypoint.sh build-simulation-existing.jmx"
                 }
             }
         }
@@ -41,7 +41,7 @@ pipeline {
                 script {
                     sh script: "cp -R ./inputs/properties/* /src/inputs/properties/"
                     echo "Jmeter running download-simulation-existing"
-                    sh script: "THREADS=${inputThreads} HOSTNAME=${inputUrl} LOOPS=${inputLoops} PORT=${inputPort} /src/entrypoint.sh download-simulation-existing.jmx"
+                    sh script: "THREAD=${inputThreads} HOSTNAME=${inputUrl} LOOPS=${inputLoops} PORT=${inputPort} /src/entrypoint.sh download-simulation-existing.jmx"
                 }
             }
         }
@@ -50,14 +50,14 @@ pipeline {
                 script {
                     sh script: "cp -R ./inputs/properties/* /src/inputs/properties/"
                     echo "Jmeter running upload-simulation-existing"
-                    sh script: "THREADS=${inputThreads} HOSTNAME=${inputUrl} LOOPS=${inputLoops} PORT=${inputPort} /src/entrypoint.sh upload-simulation-existing.jmx"
+                    sh script: "THREAD=${inputThreads} HOSTNAME=${inputUrl} LOOPS=${inputLoops} PORT=${inputPort} /src/entrypoint.sh upload-simulation-existing.jmx"
                 }
             }
         }
         stage('Archive & Publish'){
             steps{
                 script{
-                    sh script: "cp /src/*.log $WORKSPACE"
+                    sh script: "cp /src/*.log ./"
                     sh script: """#!/bin/bash
                     echo "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" >> combined.xml && \
                     echo "<testResults version=\"1.2\">" >> combined.xml && \
