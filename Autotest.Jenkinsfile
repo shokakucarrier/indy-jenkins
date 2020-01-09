@@ -39,7 +39,7 @@ pipeline {
         stage('Run Download Test'){
             steps {
                 script {
-                    sh script: "cp $WORKSPACE/inputs/properties/container.properties /src/inputs/properties/container.properties"
+                    sh script: "cp -R ./inputs/properties/* /src/inputs/properties/"
                     echo "Jmeter running download-simulation-existing"
                     sh script: "THREADS=${inputThreads} HOSTNAME=${inputUrl} LOOPS=${inputLoops} PORT=${inputPort} /src/entrypoint.sh download-simulation-existing.jmx"
                 }
@@ -48,7 +48,7 @@ pipeline {
         stage('Run Upload Test'){
             steps {
                 script {
-                    sh script: "cp $WORKSPACE/inputs/properties/container.properties /src/inputs/properties/container.properties"
+                    sh script: "cp -R ./inputs/properties/* /src/inputs/properties/"
                     echo "Jmeter running upload-simulation-existing"
                     sh script: "THREADS=${inputThreads} HOSTNAME=${inputUrl} LOOPS=${inputLoops} PORT=${inputPort} /src/entrypoint.sh upload-simulation-existing.jmx"
                 }
