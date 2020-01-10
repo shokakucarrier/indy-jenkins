@@ -3,7 +3,7 @@ def artifact="deployments/launcher/target/*-skinny.tar.gz"
 
 def ocp_map = '/mnt/ocp/jenkins-openshift-mappings.json'
 def bc_section = 'build-configs'
-def my_bc = null
+def my_bc = 'indy-binary-build'
 
 pipeline {
     agent { label 'maven' }
