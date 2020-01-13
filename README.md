@@ -12,4 +12,21 @@ This is Jenkins CI script store for indy product and library
 |----------------|-----|-------------------------------------------------------|
 |INDY_GIT_BRANCH|String|master|
 |INDY_GIT_REPO|String|https://github.com/Commonjava/indy|
-|INDY_MAJOR_VERSION|String|1.9.10|
+|INDY_MAJOR_VERSION|String|1.10.0|
+
+**Autotest required**
+|Parameters      |Type |Default Value                                          |
+|----------------|-----|-------------------------------------------------------|
+|THREADS|String|5|
+|INDY_HOSTNAME|String|indy-perf-nos-automation.cloud.paas.psi.redhat.com|
+|LOOPS|String|10|
+
+**deployment required**
+|Parameters      |Type |Default Value                                          |
+|----------------|-----|-------------------------------------------------------|
+|TOWER_HOST|String|https://tower.engineering.redhat.com/|
+|TEMPLATE_ID|String|850|
+
+* Jenkins Credential Username and Password Tower_Auth is needed and script can access it.
+
+_850 is templpate id of nos-automation - deploy-indy-perf_
