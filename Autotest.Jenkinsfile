@@ -14,7 +14,6 @@ pipeline {
         stage('Run Download Test'){
             steps {
                 script {
-                    sh script: "cp -R ./inputs/properties/* /src/inputs/properties/"
                     echo "Jmeter running download-simulation-existing"
                     sh script: "THREAD=${params.THREADS} HOSTNAME=${params.INDY_HOSTNAME} LOOPS=${params.LOOPS} PORT=80 /src/entrypoint.sh download-simulation-existing.jmx"
                 }
@@ -23,7 +22,6 @@ pipeline {
         stage('Run Upload Test'){
             steps {
                 script {
-                    sh script: "cp -R ./inputs/properties/* /src/inputs/properties/"
                     echo "Jmeter running upload-simulation-existing"
                     sh script: "THREAD=${params.THREADS} HOSTNAME=${params.INDY_HOSTNAME} LOOPS=${params.LOOPS} PORT=80 /src/entrypoint.sh upload-simulation-existing.jmx"
                 }
