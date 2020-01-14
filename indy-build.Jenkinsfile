@@ -80,7 +80,7 @@ pipeline {
       steps{
         script{
           checkout([$class      : 'GitSCM', branches: [[name: params.INDY_GIT_BRANCH]], doGenerateSubmoduleConfigurations: false,
-                    extensions  : [[$class: 'CleanCheckout']], submoduleCfg: [],
+                    extensions  : [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'indy'], [$class: 'CleanCheckout']], submoduleCfg: [],
                     userRemoteConfigs: [[url: params.INDY_GIT_REPO, refspec: '+refs/heads/*:refs/remotes/origin/* +refs/pull/*/head:refs/remotes/origin/pull/*/head']]])
           env.INDY_GIT_COMMIT = sh(returnStdout: true, script: 'git rev-parse HEAD').trim()
 
@@ -95,20 +95,32 @@ pipeline {
       steps{
         sh """#!/bin/bash
         echo 'Executing build for : ${params.INDY_GIT_REPO} ${params.INDY_MAJOR_VERSION}:${BUILD_NUMBER}'
+        cd indy
         mvn versions:set -DnewVersion=${params.INDY_MAJOR_VERSION}-rc${BUILD_NUMBER}
         """
       }
     }
     stage('Build'){
       steps{
-        sh "mvn -B -V clean verify"
+        dir("indy"){
+          sh "mvn -B -V clean verify"
+        }
       }
     }
-    //stage('Function test'){
-    //  steps {
-    //    sh 'mvn -B -V verify -Prun-its -Pci'
-    //  }
-    //}
+    stage('Function test'){
+      steps {
+        dir("indy"){
+          sh 'mvn -B -V verify -Prun-its -Pci'
+        }
+      }
+    }
+    stage('Maven License Format Checking'){
+      steps{
+        dir("indy"){
+          sh 'mvn -B -e license:format'
+        }
+      }
+    }
     stage('Archive') {
       steps {
         archiveArtifacts artifacts: "**/*${params.INDY_MAJOR_VERSION}-rc${BUILD_NUMBER}*", fingerprint: true
@@ -123,11 +135,11 @@ pipeline {
           openshift.withCluster() {
             def artifact="deployments/launcher/target/*-skinny.tar.gz"
             def artifact_file = sh(script: "ls $artifact", returnStdout: true)?.trim()
-            def tarball_url = "${BUILD_URL}artifact/$artifact_file"
+            def tarball_url = "${BUILD_URL}artifact/indy/$artifact_file"
 
             def data_artifact="deployments/launcher/target/*-data.tar.gz"
             def data_artifact_file = sh(script: "ls $data_artifact", returnStdout: true)?.trim()
-            def data_tarball_url = "${BUILD_URL}artifact/$data_artifact_file"
+            def data_tarball_url = "${BUILD_URL}artifact/indy/$data_artifact_file"
 
             def template = readYaml file: 'openshift/indy-container.yaml'
             def processed = openshift.process(template,
