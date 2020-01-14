@@ -71,8 +71,8 @@ objects:
     source:
       contextDir: indy
       git:
-        ref: "${INDY_GIT_BRANCH}"
-        uri: "${INDY_GIT_REPO}"
+        ref: "master"
+        uri: "https://github.com/Commonjava/commonjava-images.git"
     strategy:
       dockerStrategy:
         noCache: true
