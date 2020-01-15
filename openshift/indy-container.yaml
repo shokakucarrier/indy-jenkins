@@ -62,11 +62,6 @@ objects:
         kind: "ImageStreamTag"
         name: "${INDY_IMAGESTREAM_NAME}:${INDY_IMAGE_TAG}"
         namespace: "${INDY_IMAGESTREAM_NAMESPACE}"
-      #pushSecret:
-        #name: quaydotio-nosbot
-      #to:
-        #kind: DockerImage
-        #name: quay.io/factory2/indy:latest
     runPolicy: Serial
     source:
       contextDir: indy

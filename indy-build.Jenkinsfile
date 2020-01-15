@@ -217,10 +217,11 @@ pipeline {
       }
     }
     stage('tag and push image to quay'){
-      when
-        expression{
-          return params.FORCE_PUBLISH_IMAGE == 'true' || env.PR_NO
+      when {
+        expression {
+          return params.FORCE_PUBLISH_IMAGE == 'true' || !env.PR_NO
         }
+      }
       steps{
         script{
           openshfit.withCluster(){
@@ -238,7 +239,7 @@ pipeline {
     stage('Tag image in ImageStream'){
       when {
         expression {
-          return "${params.INDY_DEV_IMAGE_TAG}" && params.TAG_INTO_IMAGESTREAM == "true" && (params.FORCE_PUBLISH_IMAGE == 'true' || env.PR_NO)
+          return "${params.INDY_DEV_IMAGE_TAG}" && params.TAG_INTO_IMAGESTREAM == "true" && (params.FORCE_PUBLISH_IMAGE == 'true' || !env.PR_NO)
         }
       }
       steps{
