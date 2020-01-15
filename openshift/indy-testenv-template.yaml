@@ -1,0 +1,886 @@
+apiVersion: v1
+kind: Template
+metadata:
+  name: indy-testenv-template
+labels:
+  template: "indy-testenv-template"
+parameters:
+- name: NAME
+  displayName: Short unique identifier for the templated instances.
+  required: true
+  value: "indy-testenv"
+- name: INDY_IMAGE_TAG
+  displayName: Tag of resulting image
+  required: true
+  value: latest
+- name: INDY_IMAGE_REF
+  displayName: Indy image reference link from ImageStream
+  required: true
+  value: ''
+- name: CONNECTION_POOLS_SECRET
+  displayName: for indy-perf connection-pools.conf
+  required: true
+  value: ''
+- name: CA_CRT_SECRET
+  displayName: for indy-perf ca.crt
+  required: true
+  value: ''
+- name: CA_DER_SECRET
+  displayName: for indy-perf ca.der
+  required: true
+  value: ''
+- name: KAFKA_KEYSTORE_SECRET
+  displayName: for indy-perf KafkaSSLKeystore.jks
+  required: true
+  value: ''
+- name: KAFKA_TRUSTSTORE_SECRET
+  displayName: for indy-perf KafkaSSLTruststore.jks
+  required: true
+  value: ''
+objects:
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: "${NAME}"
+    labels:
+      app: "${NAME}"
+  ports:
+    - port: 80
+      protocol: TCP
+      targetPort: 8080
+  spec:
+    selector:
+      deploymentconfig: "${NAME}"
+    type: ClusterIP
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: "${NAME}-proxy"
+    labels:
+      app: "${NAME}-proxy"
+  ports:
+    - port: 8081
+      protocol: TCP
+      targetPort: 8081
+  spec:
+    selector:
+      deploymentconfig: "${NAME}"
+    type: ClusterIP
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: "${NAME}-pgsql"
+    labels:
+      app: "${NAME}-pgsql"
+  ports:
+    - name: 5432-tcp
+      port: 5432
+      protocol: TCP
+      targetPort: 5432
+  spec:
+    selector:
+      deploymentconfig: "${NAME}-pgsql"
+    type: ClusterIP
+- apiVersion: v1
+  kind: Route
+  metadata:
+    labels:
+      app: "${NAME}"
+    name: "${NAME}"
+  spec:
+    to:
+      kind: Service
+      name: "${NAME}"
+- apiVersion: v1
+  kind: Secret
+  metadata:
+    labels:
+      app: "${NAME}"
+    name: "${NAME}-secrets"
+  data:
+    connection-pools.conf: |
+      ${CONNECTION_POOLS_SECRET}
+- apiVersion: v1
+  kind: Secret
+  metadata:
+    labels:
+      app: "${NAME}"
+    name: "${NAME}-proxy-secrets"
+  data:
+    ca.crt: |
+      ${CA_CRT_SECRET}
+    ca.der: |
+      ${CA_DER_SECRET}
+- apiVersion: v1
+  kind: Secret
+  metadata:
+    labels:
+      app: "${NAME}" 
+    name: "${NAME}-kafka-secrets"
+  data:
+    KafkaSSLKeystore.jks: |
+      ${KAFKA_KEYSTORE_SECRET}
+    KafkaSSLTruststore.jks: |
+      ${KAFKA_TRUSTSTORE_SECRET}
+- apiVersion: v1
+  kind: Secret
+  metadata:
+    labels:
+      app: "${NAME}-pgsql"
+    name: "${NAME}-pgsql-secrets"
+  data:
+    POSTGRESQL_DATABASE: aW5keS1wZXJm
+    POSTGRESQL_PASSWORD: Z1J3WGh1ejlmIzIwUWNAUWo2QzEwY1BuSQ==
+    POSTGRESQL_USER: aW5keS1wZXJm
+- apiVersion: apps.openshift.io/v1
+  kind: DeploymentConfig
+  metadata:
+    labels:
+      app: "${NAME}-pgsql"
+    name: "${NAME}-pgsql"
+  spec:
+    replicas: 1
+    selector:
+      deploymentconfig: "${NAME}-pgsql"
+    strategy:
+      activeDeadlineSeconds: 21600
+      recreateParams:
+        timeoutSeconds: 600
+      type: Recreate
+    template:
+      metadata:
+        labels:
+          deploymentconfig: "${NAME}-pgsql"
+      spec:
+        containers:
+          image: docker-registry.default.svc:5000/openshift/postgresql
+          imagePullPolicy: Always
+          name: "${NAME}-pgsql"
+          envFrom:
+          - secretRef:
+            name: "${NAME}-pgsql-secrets"
+          ports:
+          - containerPort: 5432
+            protocol: TCP
+          resources:
+            limits:
+              cpu: 512m
+              memory: 1000Mi
+            requests:
+              cpu: 512m
+              memory: 1000Mi
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+    triggers:
+    - type: ConfigChange
+    - imageChangeParams:
+        automatic: true
+        containerNames:
+        - ${NAME}-pgsql
+        from:
+          kind: ImageStreamTag
+          name: postgresql:latest
+          namespace: openshift
+      type: ImageChange
+- apiVersion: apps.openshift.io/v1
+  kind: DeploymentConfig
+  metadata:
+    name: "${NAME}"
+    labels:
+      app: "${NAME}"
+  spec:
+    replicas: 1
+    selector:
+      deploymentconfig: "${NAME}"
+    strategy:
+      activeDeadlineSeconds: 21600
+      type: Recreate
+    template:
+      metadata:
+        creationTimestamp: null
+        labels:
+          deploymentconfig: "${NAME}"
+      spec:
+        containers:
+          - image: "${INDY_IMAGE_REF}"
+            name: "${NAME}"
+            env:
+              - name: JAVA_OPTS
+                value: -server -Xms18G -Xmx18G -Xss256k -XX:+AlwaysPreTouch -XX:+UseTransparentHugePages
+                  -XX:+UseShenandoahGC -XX:ShenandoahGCHeuristics=compact -XX:+UseNUMA -XX:-UseBiasedLocking
+                  -XX:+DisableExplicitGC -Xloggc:/opt/indy/var/log/indy/indy-gc.log -XX:+UseGCLogFileRotation
+                  -XX:NumberOfGCLogFiles=5 -XX:GCLogFileSize=10M -XX:+PrintGCApplicationConcurrentTime
+                  -XX:+PrintGCApplicationStoppedTime -XX:+PrintGCID -XX:+PrintGCTimeStamps -XX:+PrintGCDateStamps
+                  -XX:+PrintGC -XX:+PrintGCDetails -XX:+PrintTenuringDistribution -XX:+ExitOnOutOfMemoryError
+                  -Djava.util.concurrent.ForkJoinPool.common.parallelism=80
+              - name: HOSTNAME
+                valueFrom:
+                  fieldRef:
+                    fieldPath: spec.nodeName
+              - name: POD_NAME
+                valueFrom:
+                  fieldRef:
+                    fieldPath: metadata.name
+              - name: POD_NAMESPACE
+                valueFrom:
+                  fieldRef:
+                    fieldPath: metadata.namespace
+              - name: POD_IP
+                valueFrom:
+                  fieldRef:
+                    fieldPath: status.podIP
+            livenessProbe:
+              failureThreshold: 2
+              httpGet:
+                path: /healthcheck
+                port: 8080
+                scheme: HTTP
+              initialDelaySeconds: 420
+              periodSeconds: 360
+              successThreshold: 1
+              timeoutSeconds: 240
+            readinessProbe:
+              failureThreshold: 3
+              httpGet:
+                path: /healthcheck
+                port: 8080
+                scheme: HTTP
+              initialDelaySeconds: 30
+              periodSeconds: 10
+              successThreshold: 1
+              timeoutSeconds: 240
+            ports:
+              - containerPort: 8080
+                protocol: TCP
+              - containerPort: 8081
+                protocol: TCP
+            resources:
+              requests:
+                cpu: 24
+                memory: 24000Mi
+              limits:
+                cpu: 24
+                memory: 24000Mi
+            terminationMessagePath: /dev/termination-log
+            terminationMessagePolicy: File
+            volumeMounts:
+              - name: config-${NAME}-config
+                mountPath: /opt/indy/etc/indy
+              - name: config-${NAME}-logging-config
+                mountPath: /opt/indy/etc/indy/logging
+              - name: config-${NAME}-scripts-stores
+                mountPath: /opt/indy/etc/indy/scripts/stores
+              - name: config-${NAME}-promote-rule-sets
+                mountPath: /opt/indy/etc/indy/promote/rule-sets
+              - name: secret-${NAME}-secrets
+                mountPath: /mnt/secrets-indy
+              - name: secret-${NAME}-kafka-secrets
+                mountPath: /opt/indy/etc/indy/kafka
+              - name: secret-${NAME}-proxy-secrets
+                mountPath: /opt/indy/etc/indy/proxy
+        volumes:
+          - name: config-${NAME}-config
+            configMap:
+              defaultMode: 0755
+              name: ${NAME}-config
+          - name: config-${NAME}-logging-config
+            configMap:
+              defaultMode: 0755
+              name: ${NAME}-logging-config
+          - name: config-${NAME}-scripts-stores
+            configMap:
+              defaultMode: 0755
+              name: ${NAME}-scripts-stores
+          - name: config-${NAME}-promote-rule-sets
+            configMap:
+              defaultMode: 0755
+              name: ${NAME}-promote-rule-sets
+          - name: secret-${NAME}-secrets
+            secret:
+              defaultMode: 0400
+              secretName: ${NAME}-secrets
+          - name: secret-${NAME}-kafka-secrets
+            secret:
+              defaultMode: 0400
+              secretName: ${NAME}-kafka-secrets
+          - name: secret-${NAME}-proxy-secrets
+            secret:
+              defaultMode: 0400
+              secretName: ${NAME}-proxy-secrets
+        schedulerName: default-scheduler
+- apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    labels:
+      app: "${NAME}"
+    name: "${NAME}-config"
+  data:
+    main.conf: |
+      nfc.timeout=10800
+      mdc.headers=User-Agent
+      
+      [ui]
+      ui.dir=/usr/share/indy/ui
+      
+      
+      [flatfiles]
+      data.dir=${indy.home}/var/lib/indy/data
+      work.dir=${indy.home}/var/lib/indy/work
+      
+      
+      [storage-default]
+      storage.dir=${indy.home}/var/lib/indy/storage
+      
+      
+      [autoprox]
+      enabled=false
+      
+      
+      [koji]
+      enabled=true
+      url=https://brewhub.engineering.redhat.com/brewhub
+      storage.root.url=http://download.eng.bos.redhat.com/brewroot
+      
+      # Only proxy artifacts that use redhat version qualifiers.
+      #
+      version.filter=.+[-.]redhat[-_]\d+
+      
+      tag.patterns.enabled=true
+      tag.pattern=(sso|amq|rhmap|jb|jboss|jws)-.+
+      
+      target.build.+=brew-proxies
+      target.DA.*=brew-proxies
+      
+      
+      [content-browse]
+      # By default, the add-on is enabled.
+      #
+      #enabled=true
+      content.browse.ui.dir=/usr/share/indy/ui/content-browse
+      
+      
+      [content-index]
+      enabled=true
+      
+      # This property is used to control if authoritative index is enabled. the authoritative index means:
+      # in terms of performance consideration, we will use content-index as the one-time check for the content
+      # access, and if not found in content indexing, will treat it as "no content" and bypass the following access to the storage.
+      
+      support.authoritative.indexes=false
+      
+      
+      [folo]
+      # By default, the cache of tracked-content records times out at 2 minutes (120 seconds).
+      #
+      # This means that any records in the cache will be persisted to disk after 2 minutes of inactivity. If more content is accessed in a
+      # tracked repository/group after the associated record is persisted, it will be reloaded from disk and re-cached, with changes incorporated
+      # afterward.
+      #
+      #cache.timeout.seconds=120
+      
+      
+      [httprox]
+      enabled=true
+      secured=true
+      
+      MITM.enabled=true
+      MITM.ca.key=${indy.config.dir}/proxy/ca.der
+      MITM.ca.cert=${indy.config.dir}/proxy/ca.crt
+      MITM.dn.template=CN=<host>, O=Test Org
+      
+      
+      [implied-repos]
+      enabled=true
+      
+      disable=people.apache.org
+      disable=antlr.org
+      disable=snapshots.repository.codehaus.org
+      disable=repository.codehaus.org
+      disable=download.java.net
+      disable=mc-repo.googlecode.com
+      disable=maven.tmatesoft.com
+      disable=files.couchbase.com
+      disable=www.terracotta.org
+      disable=static.springframework.org
+      disable=\$\{tycho-snapshots-repo\}
+      disable=.*codehaus.org
+      disable=.*java.net
+      disable=.+service.local.staging.*
+      
+      
+      enabled.group=public
+      enabled.group=build-\d+
+      
+      
+      [indexer]
+      enabled=false
+      
+      
+      [keycloak]
+      enabled=false
+      url=https://secure-sso-newcastle-stage.psi.redhat.com/auth/
+      server.credential.secret=ee9e52a1-e469-40b0-849c-d375fda150fb
+      server.resource=pncindy
+      ui.resource=pncindyui
+      
+      keycloak.json=${indy.config.dir}/keycloak/keycloak.json
+      keycloak-ui.json=${indy.config.dir}/keycloak/keycloak-ui.json
+      security-bindings.json=${indy.config.dir}/keycloak/security-bindings.json
+      
+      realm=pncredhat
+      
+      realm.public.key=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAhQPDAtrf7+5+4q3xVtRyMcxTv+OOMTrdRHi8WacPGXey7SozvjqgzQNp4OruZyVQ1crqxSCvkPwFOQSn9ZCrN8y+FOAiTA4Bpt0Vre3dvfchM01SHeQT6c/Adb/zGSaJmGZWkkChQYJVzqSRaqwIRCrgp00JPRIuPx9XsbGJGfYLFi18nE/PfZlow62Kr2HRG6MnzsaASlqbntBrNidrexx2T8luqSr6AuZcIkpsEIGYZAISIQXvySC3+0ODdTpFYBX3nmmeFwfU2A7JZRF6La2I4NnpKuF5948YYzBUQb4tXklFPD4bh4p6YSdtuL1aMtAoBjQ3Ame9FxQDFxWtlwIDAQAB
+      
+      
+      [metrics]
+      enabled = true
+      reporter.enabled = true
+      
+      koji.enabled = true
+      ispn.enabled = true
+      
+      node.prefix = indy-perf
+      
+      reporter = prometheus
+      
+      measure.transport=true
+      measure.transport.repos=mrrc-ga*,koji*,jboss*,central
+      
+      
+      [promote]
+      enabled=true
+      lock.timeout.seconds=7200
+      autolock.hosted.repos=false
+      
+      
+      [revisions]
+      enabled=false
+      conflict.action=keep
+      
+      
+      [threadpools]
+      
+      defaultThreads=24
+      defaultPriority=5
+      
+      # Used to clear obsolete files in response to group membership changes and store enable/disable events
+      content-cleanup.threads=20
+      content-cleanup.priority=6
+      content-cleanup.maxLoadFactor=99999
+      
+      # Concurrency when doing direct access, such as on-system content listings for metadata generation
+      direct-content-access.threads=40
+      direct-content-access.priority=7
+      direct-content-access.maxLoadFactor=99999
+      
+      # Concurrency in doing non-batch content retrieval
+      galley-transfers.threads=20
+      galley-transfers.priority=9
+      galley-transfers.maxLoadFactor=99999
+      
+      # Concurrency when retrieving in batch, as with metadata (otherwise rare)
+      galley-batching.threads=20
+      galley-batching.priority=6
+      galley-batching.maxLoadFactor=99999
+      
+      # Concurrent retrieval / handling of metadata parts to be aggregated
+      maven-metadata-generator.threads=40
+      maven-metadata-generator.priority=6
+      maven-metadata-generator.maxLoadFactor=99999
+      
+      # Processing of JEE events (mainly ArtifactStoreEvent variants)
+      indy-event-dispatch.threads=20
+      indy-event-dispatch.priority=2
+      indy-event-dispatch.maxLoadFactor=99999
+      
+      # Concurrent processing of candidate hits from Koji for metadata generation
+      koji-metadata.threads=20
+      koji-metadata.priority=5
+      koji-metadata.maxLoadFactor=99999
+      
+      # Concurrent lookup inside the KojijiClient itself
+      koji-queries.threads=20
+      koji-queries.priority=5
+      koji-queries.maxLoadFactor=99999
+      
+      # Concurrency of path checks within a rule
+      promote-validation-rules-executor.threads=40
+      promote-validation-rules-executor.priority=5
+      promote-validation-rules-executor.maxLoadFactor=99999
+      
+      # Concurrent execution of validation rules themselves
+      promote-validation-rules-runner.threads=20
+      promote-validation-rules-runner.priority=5
+      promote-validation-rules-runner.maxLoadFactor=99999
+      
+      # Concurrent promotions that can be started
+      promotion.threads=10
+      promotion.priority=5
+      promotion.maxLoadFactor=99999
+      
+      # Concurrent by-path copy operations
+      promotion-transfers.threads=20
+      promotion-transfers.priority=6
+      promotion-transfers.maxLoadFactor=99999
+      
+      # Folo recalculator
+      folo-recalculator.threads=20
+      folo-recalculator.priority=2
+      folo-recalculator.maxLoadFactor=99999
+      
+      
+      # Include addon-specific configurations (or really any configuration) from:
+      Include /mnt/secrets-indy/connection-pools.conf
+      
+    infinispan.xml: |
+      <?xml version="1.0" encoding="UTF-8"?>
+      <infinispan xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xsi:schemaLocation="urn:infinispan:config:9.4 http://www.infinispan.org/schemas/infinispan-config-9.4.xsd
+                                      urn:infinispan:config:store:jdbc:9.4 http://www.infinispan.org/schemas/infinispan-cachestore-jdbc-config-9.4.xsd"
+                  xmlns="urn:infinispan:config:9.4"
+                  xmlns:jdbc="urn:infinispan:config:store:jdbc:9.4">
+      
+        <cache-container default-cache="local" name="IndyCacheManager" shutdown-hook="DEFAULT" statistics="true">
+          <local-cache-configuration name="local-template" statistics="true">
+            <!--<eviction strategy="LRU" size="200000" type="COUNT"/>-->
+            <memory>
+              <!--
+                Limits the cache to this by the amount of entries in the cache.
+                If choose memory or off-heap, make sure the key/value objects implements Serializable
+              -->
+              <object size="500"/>
+            </memory>
+          </local-cache-configuration>
+      
+          <local-cache name="local" configuration="local-template"/>
+      
+          <local-cache name="content-index" configuration="local-template" />
+      
+          <local-cache name="content-metadata" configuration="local-template"/>
+      
+          <local-cache name="maven-version-metadata-cache" deadlock-detection-spin="10000" configuration="local-template">
+            <memory>
+              <object size="200" strategy="REMOVE" />
+            </memory>
+          </local-cache>
+      
+          <local-cache name="schedule-expire-cache" configuration="local-template">
+            <expiration interval="300" />
+            <persistence>
+              <jdbc:string-keyed-jdbc-store fetch-state="false" read-only="false" purge="false" preload="true" key-to-string-mapper="org.commonjava.indy.core.expire.ScheduleCacheKey2StringMapper">
+                <jdbc:data-source jndi-url="java:/comp/env/jdbc/infinispan" />
+                <jdbc:string-keyed-table drop-on-exit="false" create-on-start="true" prefix="ispn">
+                  <jdbc:id-column name="id_column" type="TEXT" />
+                  <jdbc:data-column name="data_column" type="BYTEA" />
+                  <jdbc:timestamp-column name="timestamp_column" type="BIGINT" />
+                </jdbc:string-keyed-table>
+              </jdbc:string-keyed-jdbc-store>
+            </persistence>
+          </local-cache>
+      
+          <local-cache name="nfc" configuration="local-template">
+            <!--
+              Expires in 72 hours and run expiration every 15 minutes.
+            -->
+            <expiration lifespan="259200000" max-idle="259200000" interval="900000" />
+            <memory>
+              <object size="10000" strategy="REMOVE" />
+            </memory>
+            <indexing index="LOCAL">
+              <property name="default.directory_provider">ram</property>
+            </indexing>
+          </local-cache>
+      
+          <local-cache name="store-data" configuration="local-template">
+            <persistence>
+              <jdbc:string-keyed-jdbc-store fetch-state="false" read-only="false" purge="false" preload="true" key-to-string-mapper="org.commonjava.indy.pkg.maven.content.StoreKey2StringMapper">
+                <jdbc:data-source jndi-url="java:/comp/env/jdbc/infinispan" />
+                <jdbc:string-keyed-table drop-on-exit="false" create-on-start="true" prefix="ispn">
+                  <jdbc:id-column name="id_column" type="TEXT" />
+                  <jdbc:data-column name="data_column" type="BYTEA" />
+                  <jdbc:timestamp-column name="timestamp_column" type="BIGINT" />
+                </jdbc:string-keyed-table>
+              </jdbc:string-keyed-jdbc-store>
+            </persistence>
+          </local-cache>
+      
+        </cache-container>
+      </infinispan>
+- apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    labels:
+      app: "${NAME}"
+    name: "${NAME}-logging-config"
+  data:
+    logback.xml: |
+      <!--
+      
+          Copyright (C) 2011 Red Hat, Inc. (jdcasey@commonjava.org)
+      
+          Licensed under the Apache License, Version 2.0 (the "License");
+          you may not use this file except in compliance with the License.
+          You may obtain a copy of the License at
+      
+                  http://www.apache.org/licenses/LICENSE-2.0
+      
+          Unless required by applicable law or agreed to in writing, software
+          distributed under the License is distributed on an "AS IS" BASIS,
+          WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+          See the License for the specific language governing permissions and
+          limitations under the License.
+      
+      -->
+      <configuration>
+      
+        <!--TURNED oFF BECAUSE IT CAUSES PERFORMANCE ISSUES-->
+        <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+          <!-- encoders are assigned the type
+               ch.qos.logback.classic.encoder.PatternLayoutEncoder by default -->
+          <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%-5level] [%thread] %logger{36} - %msg%n</pattern>
+          </encoder>
+      
+          <!-- deny all events with a level below INFO, that is TRACE and DEBUG -->
+          <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>INFO</level>
+          </filter>
+        </appender>
+      
+        <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+          <file>/opt/indy/var/log/indy/indy.log</file>
+          <rollingPolicy class="ch.qos.logback.core.rolling.FixedWindowRollingPolicy">
+            <fileNamePattern>/opt/indy/var/log/indy/indy.%i.log</fileNamePattern>
+      
+            <maxIndex>8</maxIndex>
+          </rollingPolicy>
+      
+          <triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
+              <maxFileSize>100MB</maxFileSize>
+          </triggeringPolicy>
+      
+          <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%-5level] [%thread] %logger{36} %X{http-request-preferred-id} %X{client-addr} - %msg%n</pattern>
+          </encoder>
+        </appender>
+      
+        <!-- This appender is used for the operation tracking, like delete or http request path tracking -->
+        <appender name="CONTENT-DELETE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+          <file>/opt/indy/var/log/indy/indy-content-delete.log</file>
+          <rollingPolicy class="ch.qos.logback.core.rolling.FixedWindowRollingPolicy">
+            <fileNamePattern>/opt/indy/var/log/indy/indy-content-delete.%i.log</fileNamePattern>
+      
+            <maxIndex>1</maxIndex>
+          </rollingPolicy>
+      
+          <triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
+            <maxFileSize>100MB</maxFileSize>
+          </triggeringPolicy>
+      
+          <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%-5level] [%thread] %logger{36} - %msg%n</pattern>
+          </encoder>
+        </appender>
+      
+        <!-- This appender is used for the operation tracking, like delete or http request path tracking -->
+        <appender name="REST-INBOUND" class="ch.qos.logback.core.rolling.RollingFileAppender">
+          <file>/opt/indy/var/log/indy/indy-rest-inbound.log</file>
+          <rollingPolicy class="ch.qos.logback.core.rolling.FixedWindowRollingPolicy">
+            <fileNamePattern>/opt/indy/var/log/indy/indy-rest-inbound.%i.log</fileNamePattern>
+      
+            <maxIndex>1</maxIndex>
+          </rollingPolicy>
+      
+          <triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
+            <maxFileSize>100MB</maxFileSize>
+          </triggeringPolicy>
+      
+          <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%-5level] [%thread] %logger{36} %X{http-request-preferred-id:-no} %X{client-addr:-no} - %msg%n</pattern>
+          </encoder>
+        </appender>
+      
+        <!-- Indy Kafka appender -->
+      <!--   <appender name="KAFKA" class="com.github.danielwegener.logback.kafka.KafkaAppender">
+          <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
+            <layout class="org.commonjava.indy.CustomJsonLayout">
+              <jsonFormatter class="ch.qos.logback.contrib.jackson.JacksonJsonFormatter"/>
+              <appendLineSeparator>true</appendLineSeparator>
+      
+      
+              <environmentMappings><![CDATA[
+                OPENSHIFT_BUILD_NAMESPACE=NAMESPACE,
+                OPENSHIFT_BUILD_NAME=BUILD_NAME,
+                OPENSHIFT_BUILD_COMMIT=BUILD_COMMIT,
+                HOSTNAME=HOSTNAME
+              ]]></environmentMappings>
+            </layout>
+          </encoder>
+          <topic>dynamic-indy-logs</topic>
+          <keyingStrategy class="com.github.danielwegener.logback.kafka.keying.HostNameKeyingStrategy" />
+          <deliveryStrategy class="com.github.danielwegener.logback.kafka.delivery.AsynchronousDeliveryStrategy" />
+      
+          <producerConfig>bootstrap.servers=kafka.datahub.redhat.com:443</producerConfig>
+          <producerConfig>security.protocol=SSL</producerConfig>
+          <producerConfig>ssl.keystore.location=/opt/indy/etc/indy/kafka/KafkaSSLKeystore.jks</producerConfig>
+          <producerConfig>ssl.keystore.password=changeit</producerConfig>
+          <producerConfig>ssl.truststore.location=/opt/indy/etc/indy/kafka/KafkaSSLTruststore.jks</producerConfig>
+          <producerConfig>ssl.truststore.password=changeit</producerConfig>
+      
+          <producerConfig>acks=0</producerConfig>
+          <producerConfig>linger.ms=1000</producerConfig>
+          <producerConfig>max.block.ms=0</producerConfig>
+          <producerConfig>client.id=${HOSTNAME}-${CONTEXT_NAME}-logback-relaxed</producerConfig>
+        </appender> -->
+      
+        <logger name="org.apache.kafka" additivity="false" level="INFO">
+          <appender-ref ref="STDOUT"/>
+          <appender-ref ref="FILE" />
+        </logger>
+      
+        <logger name="org.commonjava.topic.content.delete" level="INFO" additivity="false">
+          <appender-ref ref="CONTENT-DELETE" />
+        </logger>
+      
+        <logger name="org.commonjava.topic.rest.inbound" level="INFO" additivity="false">
+          <appender-ref ref="REST-INBOUND" />
+        </logger>
+      
+        <logger name="org.jboss" level="WARN"/>
+        <logger name="com.codahale.metrics" level="WARN"/>
+        <logger name="org.commonjava.indy.httprox" level="INFO" />
+        <logger name="org.commonjava.indy.promote" level="INFO" />
+        <logger name="org.commonjava.indy.folo" level="INFO" />
+        <logger name="org.commonjava.indy.core.content" level="INFO" />
+        <logger name="org.commonjava.indy.content.index" level="INFO" />
+      
+        <!--  TEMPORARY FOR INDY 1.1.x  -->
+        <logger name="org.commonjava.indy.core.content" level="WARN" />
+        <logger name="org.commonjava.indy.core.inject" level="WARN" />
+      
+        <logger name="org.commonjava.indy.implrepo.change.ImpliedRepositoryDetector" level="INFO" />
+        <logger name="org.commonjava.indy.httprox" level="DEBUG" />
+      
+        <!-- <logger name="org.infinispan.persistence.jdbc.stringbased.JdbcStringBasedStore" level="TRACE" /> -->
+      
+        <!--
+        <logger name="org.commonjava" level="INFO" />
+        <logger name="org.jboss.resteasy" level="DEBUG"/>
+        -->
+        <logger name="org.commonjava.maven.galley.transport" level="INFO" />
+        <!-- <logger name="org.keycloak" level="TRACE" /> -->
+      
+        <logger name="org.commonjava.indy.subsys.cpool.ConnectionPoolConfig" level="DEBUG" />
+      
+        <root level="INFO">
+          <!--appender-ref ref="STDOUT" /-->
+          <appender-ref ref="FILE" />
+          <!-- <appender-ref ref="KAFKA" /> -->
+        </root>
+      
+      </configuration>
+- apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    labels:
+      app: "${NAME}"
+    name: "${NAME}-promote-rule-sets"
+  data:
+    pnc-builds.json: |
+      {
+        "name": "pnc-builds",
+        "storeKeyPattern": "maven:[^:]+:pnc-builds",
+        "ruleNames": [
+          "parsable-pom.groovy",
+          "no-pre-existing-paths.groovy",
+          "project-version-pattern.groovy"
+        ],
+        "validationParameters": {
+          "availableInStores": "group:redhat-builds",
+          "classifierAndTypeSet": "javadoc:jar, sources:jar",
+          "versionPattern": "\\d+\\.\\d+\\.\\d+\\.(?:[\\w_-]+-)?redhat-\\d{5}"
+        }
+      }
+    shared-imports.json: |
+      {
+        "name": "shared-imports",
+        "storeKeyPattern": "hosted:shared-imports",
+        "ruleNames": [
+        	"no-snapshot-paths.groovy"
+        ]
+      }
+    temporary-builds.json: |
+      {
+        "name": "temporary-builds",
+        "storeKeyPattern": "group:temporary-builds",
+        "ruleNames": [
+          "parsable-pom.groovy",
+          "no-pre-existing-paths.groovy",
+          "project-version-pattern.groovy"
+        ],
+        "validationParameters": {
+          "availableInStores": "group:redhat-builds,group:temporary-builds",
+          "classifierAndTypeSet": "javadoc:jar, sources:jar",
+          "versionPattern": "\\d+\\.\\d+\\.\\d+\\.(?:[\\w_-]+-)?(?:(?:temporary)|(?:t\\d{8}-\\d{6}-\\d{3}))-redhat-\\d+"
+        }
+      }
+- apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    labels:
+      app: "${NAME}"
+    name: "${NAME}-scripts-stores"
+  data:
+    implied-repo-creator.groovy: |
+      package org.commonjava.indy.implrepo;
+      
+      import org.commonjava.indy.implrepo.change.ImpliedRepositoryCreator
+      import org.commonjava.atlas.maven.ident.ref.ProjectVersionRef;
+      import org.commonjava.maven.galley.maven.model.view.RepositoryView;
+      import org.commonjava.indy.model.core.RemoteRepository;
+      import org.slf4j.Logger;
+      
+      class RepoCreator implements ImpliedRepositoryCreator
+      {
+          @Override
+          RemoteRepository createFrom(ProjectVersionRef implyingGAV, RepositoryView repo, Logger logger) {
+              RemoteRepository rr = new RemoteRepository( "maven", repo.getId(), repo.getUrl() );
+      
+              rr.setAllowSnapshots( repo.isSnapshotsEnabled() );
+              rr.setAllowReleases( repo.isReleasesEnabled() );
+      
+              rr.setMetadataTimeoutSeconds(86400);
+      
+              rr.setPathMaskPatterns(['r|^((?!-redhat-[0-9]+).)*$|'].toSet());
+      
+              rr.setDescription( "Implicitly created repo for: " + repo.getName() + " (" + repo.getId()
+                      + ") from repository declaration in POM: " + implyingGAV );
+      
+              rr
+          }
+      
+      }
+    koji-repo-creator.groovy: |
+      package org.commonjava.indy.koji;
+      
+      import org.commonjava.indy.koji.content.KojiRepositoryCreator
+      import org.commonjava.indy.model.core.RemoteRepository
+      
+      class RepoCreator implements KojiRepositoryCreator
+      {
+          @Override
+          RemoteRepository createRemoteRepository(String packageType, String name, String url, Integer downloadTimeoutSeconds) {
+              RemoteRepository remote = new RemoteRepository( packageType, name, url );
+              remote.setTimeoutSeconds( downloadTimeoutSeconds );
+      
+              // redhat repos should never get automatically disabled
+              remote.setDisableTimeout( -1 );
+      
+              // this is just for optimization reasons to avoid examination due to contents filtering
+              remote.setAllowSnapshots( true );
+              remote.setAllowReleases( true );
+      
+              remote
+          }
+      
+      }

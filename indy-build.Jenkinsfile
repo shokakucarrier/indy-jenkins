@@ -154,7 +154,7 @@ pipeline {
               '-p', "DATA_TARBALL_URL=${data_tarball_url}",
             )
             def build = c3i.buildAndWait(script: this, objs: processed)
-            echo 'Container build succeeds.'
+            echo 'Container build succeeds!'
             def ocpBuild = build.object()
             env.RESULTING_IMAGE_REF = ocpBuild.status.outputDockerImageReference
             env.RESULTING_IMAGE_DIGEST = ocpBuild.status.output.to.imageDigest
@@ -182,9 +182,77 @@ pipeline {
         }
       }
     }
-    //stage('deploy test environment'){
+    /*stage('deploy test environment'){
+      steps{
+        script{
+          openshift.withCluster(){
+            def template = readYaml file: 'openshift/indy-testenv-template.yaml'
+            def processed = openshift.process(template,
+              '-p', "NAME=${params.INDY_TESTENV_NAME}",
+              '-p', "INDY_IMAGE_TAG=${env.RESULTING_TAG}",
+              '-p', "INDY_IMAGE_REF=${env.RESULTING_IMAGE_REF}",
+              '-p', "CONNECTION_POOLS_SECRET=",
+              '-p', "CA_CRT_SECRET=",
+              '-p', "CA_DER_SECRET=",
+              '-p', "KAFKA_KEYSTORE_SECRET=",
+              '-p', "KAFKA_TRUSTSTORE_SECRET=",
+            )
+            def created = openshift.create(processed)
+            echo 'Test environment deploy succeeds!'
+          }
+        }
+      }
+    }*/
+    /*stage('integration test'){
 
-    //}
+    }
+    stage('stress test'){
+
+    }*/
+    stage('deploy indy artifact'){
+      steps {
+        dir("indy"){
+          sh 'mvn help:effective-settings -B -V -DskipTests=true deploy -e'
+        }
+      }
+    }
+    /*stage('tag and push image to quay'){
+      steps{
+        script{
+
+        }
+      }
+    }*/
+  }
+  post {
+    cleanup {
+      script{
+        if (env.RESULTING_TAG) {
+          echo "Removing tag ${env.RESULTING_TAG} from the ImageStream..."
+          openshift.withCluster() {
+            openshift.withProject("${params.INDY_IMAGESTREAM_NAMESPACE}") {
+              openshift.tag("${params.INDY_IMAGESTREAM_NAME}:${env.RESULTING_TAG}",
+                "-d")
+            }
+          }
+        }
+      }
+    }
+    success {
+      script {
+      }
+    }
+    failure {
+      script {
+        if (params.MAIL_ADDRESS){
+          try {
+            sendBuildStatusEmail('failed')
+          } catch (e) {
+            echo "Error sending email: ${e}"
+          }
+        }
+      }
+    }
   }
 }
 @NonCPS
