@@ -135,11 +135,11 @@ pipeline {
           openshift.withCluster() {
             def artifact="indy/deployments/launcher/target/*-skinny.tar.gz"
             def artifact_file = sh(script: "ls $artifact", returnStdout: true)?.trim()
-            def tarball_url = "${BUILD_URL}artifact/$artifact_file"
+            env.TARBALL_URL = "${BUILD_URL}artifact/$artifact_file"
 
             def data_artifact="indy/deployments/launcher/target/*-data.tar.gz"
             def data_artifact_file = sh(script: "ls $data_artifact", returnStdout: true)?.trim()
-            def data_tarball_url = "${BUILD_URL}artifact/$data_artifact_file"
+            env.DATA_TARBALL_URL = "${BUILD_URL}artifact/$data_artifact_file"
 
             def template = readYaml file: 'openshift/indy-container.yaml'
             def processed = openshift.process(template,
@@ -150,8 +150,8 @@ pipeline {
               '-p', "INDY_VERSION=${params.INDY_MAJOR_VERSION}-rc${BUILD_NUMBER}",
               '-p', "INDY_IMAGESTREAM_NAME=${params.INDY_IMAGESTREAM_NAME}",
               '-p', "INDY_IMAGESTREAM_NAMESPACE=${params.INDY_IMAGESTREAM_NAMESPACE}",
-              '-p', "TARBALL_URL=${tarball_url}",
-              '-p', "DATA_TARBALL_URL=${data_tarball_url}",
+              '-p', "TARBALL_URL=${env.TARBALL_URL}",
+              '-p', "DATA_TARBALL_URL=${env.DATA_TARBALL_URL}",
             )
             def build = c3i.buildAndWait(script: this, objs: processed)
             echo 'Container build succeeds!'
@@ -216,13 +216,44 @@ pipeline {
         }
       }
     }
-    /*stage('tag and push image to quay'){
+    stage('tag and push image to quay'){
+      when
+        expression{
+          return params.FORCE_PUBLISH_IMAGE == 'true' || env.PR_NO
+        }
       steps{
         script{
-
+          openshfit.withCluster(){
+            def template = readYaml file: 'openshift/indy-quay-template.yaml'
+            def processed = openshift.process(template,
+              '-p', "TARBALL_URL=${env.TARBALL_URL}",
+              '-p', "DATA_TARBALL_URL=${env.DATA_TARBALL_URL}",
+            )
+            def build = c3i.buildAndWait(script: this, objs: processed)
+            echo 'Publish build succeeds!'
+          }
         }
       }
-    }*/
+    }
+    stage('Tag image in ImageStream'){
+      when {
+        expression {
+          return "${params.INDY_DEV_IMAGE_TAG}" && params.TAG_INTO_IMAGESTREAM == "true" && (params.FORCE_PUBLISH_IMAGE == 'true' || env.PR_NO)
+        }
+      }
+      steps{
+        script{
+          openshift.withCluster() {
+            openshift.withProject("${params.INDY_IMAGESTREAM_NAMESPACE}") {
+              def sourceRef = "${params.INDY_IMAGESTREAM_NAME}:${env.RESULTING_TAG}"
+              def destRef = "${params.INDY_IMAGESTREAM_NAME}:${params.INDY_DEV_IMAGE_TAG}"
+              echo "Tagging ${sourceRef} as ${destRef}"
+              openshift.tag("${sourceRef}", "${destRef}")
+            }
+          }
+        }
+      }
+    }
   }
   post {
     cleanup {
@@ -240,6 +271,7 @@ pipeline {
     }
     success {
       script {
+        echo "SUCCEED"
       }
     }
     failure {
