@@ -133,13 +133,13 @@ pipeline {
       steps {
         script {
           openshift.withCluster() {
-            def artifact="deployments/launcher/target/*-skinny.tar.gz"
+            def artifact="indy/deployments/launcher/target/*-skinny.tar.gz"
             def artifact_file = sh(script: "ls $artifact", returnStdout: true)?.trim()
-            def tarball_url = "${BUILD_URL}artifact/indy/$artifact_file"
+            def tarball_url = "${BUILD_URL}artifact/$artifact_file"
 
-            def data_artifact="deployments/launcher/target/*-data.tar.gz"
+            def data_artifact="indy/deployments/launcher/target/*-data.tar.gz"
             def data_artifact_file = sh(script: "ls $data_artifact", returnStdout: true)?.trim()
-            def data_tarball_url = "${BUILD_URL}artifact/indy/$data_artifact_file"
+            def data_tarball_url = "${BUILD_URL}artifact/$data_artifact_file"
 
             def template = readYaml file: 'openshift/indy-container.yaml'
             def processed = openshift.process(template,
@@ -161,6 +161,7 @@ pipeline {
             def imagestream = openshift.selector('is', ['app': env.BUILDCONFIG_INSTANCE_ID]).object()
             env.RESULTING_IMAGE_REPO = imagestream.status.dockerImageRepository
             env.RESULTING_TAG = env.TEMP_TAG
+            sh "printenv"
           }
         }
       }
