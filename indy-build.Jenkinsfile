@@ -211,7 +211,7 @@ pipeline {
       steps{
         withCredentials([usernamePassword(credentialsId:'Tower_Auth', passwordVariable:'PASSWORD', usernameVariable:'USERNAME')]) {
           sh """#!/bin/bash
-          curl -u ${USERNAME}:${PASSWORD} \
+          curl -k -u ${USERNAME}:${PASSWORD} \
           -H 'Content-Type: application/json' \
           --data '{}' \
           -X POST ${params.TOWER_HOST}api/v2/job_templates/850/launch/
