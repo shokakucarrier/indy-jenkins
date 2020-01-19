@@ -161,7 +161,6 @@ pipeline {
             def imagestream = openshift.selector('is', ['app': env.BUILDCONFIG_INSTANCE_ID]).object()
             env.RESULTING_IMAGE_REPO = imagestream.status.dockerImageRepository
             env.RESULTING_TAG = env.TEMP_TAG
-            sh "printenv"
           }
         }
       }
@@ -182,40 +181,6 @@ pipeline {
         }
       }
     }
-    /*stage('deploy test environment'){
-      steps{
-        script{
-          openshift.withCluster(){
-            def template = readYaml file: 'openshift/indy-testenv-template.yaml'
-            def processed = openshift.process(template,
-              '-p', "NAME=${params.INDY_TESTENV_NAME}",
-              '-p', "INDY_IMAGE_TAG=${env.RESULTING_TAG}",
-              '-p', "INDY_IMAGE_REF=${env.RESULTING_IMAGE_REF}",
-              '-p', "CONNECTION_POOLS_SECRET=",
-              '-p', "CA_CRT_SECRET=",
-              '-p', "CA_DER_SECRET=",
-              '-p', "KAFKA_KEYSTORE_SECRET=",
-              '-p', "KAFKA_TRUSTSTORE_SECRET=",
-            )
-            def created = openshift.create(processed)
-            echo 'Test environment deploy succeeds!'
-          }
-        }
-      }
-    }*/
-    /*stage('integration test'){
-
-    }
-    stage('stress test'){
-
-    }*/
-    stage('deploy indy artifact'){
-      steps {
-        dir("indy"){
-          sh 'mvn help:effective-settings -B -V -DskipTests=true deploy -e'
-        }
-      }
-    }
     stage('tag and push image to quay'){
       when {
         expression {
@@ -224,15 +189,51 @@ pipeline {
       }
       steps{
         script{
-          openshfit.withCluster(){
+          openshift.withCluster(){
             def template = readYaml file: 'openshift/indy-quay-template.yaml'
             def processed = openshift.process(template,
               '-p', "TARBALL_URL=${env.TARBALL_URL}",
               '-p', "DATA_TARBALL_URL=${env.DATA_TARBALL_URL}",
+              '-p', "QUAY_TAG=${params.INDY_DEV_IMAGE_TAG}"
             )
             def build = c3i.buildAndWait(script: this, objs: processed)
             echo 'Publish build succeeds!'
           }
+        }
+      }
+    }
+    stage('deploy test environment'){
+      when {
+        expression {
+          return params.FORCE_PUBLISH_IMAGE == 'true' || !env.PR_NO
+        }
+      }
+      steps{
+        withCredentials([usernamePassword(credentialsId:'Tower_Auth', passwordVariable:'PASSWORD', usernameVariable:'USERNAME')]) {
+          sh """#!/bin/bash
+          curl -u ${USERNAME}:${PASSWORD} \
+          -H 'Content-Type: application/json' \
+          --data '{}' \
+          -X POST ${params.TOWER_HOST}api/v2/job_templates/850/launch/
+          """
+        }
+      }
+    }
+    /*stage('integration test'){
+
+    }
+    stage('stress test'){
+
+    }*/
+    stage('deploy indy artifact'){
+      when {
+        expression {
+          return params.FORCE_PUBLISH_IMAGE == 'true' || !env.PR_NO
+        }
+      }
+      steps {
+        dir("indy"){
+          sh 'mvn help:effective-settings -B -V -DskipTests=true deploy -e'
         }
       }
     }

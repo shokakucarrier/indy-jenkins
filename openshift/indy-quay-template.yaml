@@ -17,6 +17,10 @@ parameters:
   displayName: indy app version
   required: false
   value: ''
+- name: QUAY_TAG
+  displayName: tag to push to quay
+  required: false
+  value: 'latest'
 objects:
 - kind: "BuildConfig"
   apiVersion: "v1"
@@ -31,7 +35,7 @@ objects:
         name: quaydotio-nosbot
       to:
         kind: DockerImage
-        name: quay.io/factory2/indy:latest
+        name: quay.io/factory2/indy:${QUAY_TAG}
     runPolicy: Serial
     source:
       contextDir: indy
