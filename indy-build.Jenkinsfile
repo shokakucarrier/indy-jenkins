@@ -92,11 +92,16 @@ pipeline {
       }
     }
     stage('Get Version'){
+      when {
+        expression {
+          return params.INDY_GIT_BRANCH == 'release'
+        }
+      }
       steps{
         sh """#!/bin/bash
-        echo 'Executing build for : ${params.INDY_GIT_REPO} ${params.INDY_MAJOR_VERSION}:${BUILD_NUMBER}'
+        echo 'Executing build for : ${params.INDY_GIT_REPO} ${params.INDY_MAJOR_VERSION}'
         cd indy
-        mvn versions:set -DnewVersion=${params.INDY_MAJOR_VERSION}-rc${BUILD_NUMBER}
+        mvn versions:set -DnewVersion=${params.INDY_MAJOR_VERSION}
         """
       }
     }
@@ -256,6 +261,11 @@ pipeline {
         }
       }
     }
+    /*stage('Deploy to Newcastle'){
+      script{
+
+      }
+    }*/
   }
   post {
     cleanup {
