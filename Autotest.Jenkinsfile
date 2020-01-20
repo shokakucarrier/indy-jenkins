@@ -17,8 +17,11 @@ pipeline {
           image: quay.io/kaine/indy-stress-tester:latest
           imagePullPolicy: Always
           tty: true
+          env:
           - name: HOME
             value: /home/jenkins
+          - name: USER
+            value: 'jenkins-k8s-config'
           resources:
             requests:
               memory: 1500Mi
