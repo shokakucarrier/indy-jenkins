@@ -94,6 +94,13 @@ pipeline {
         }
       }
     }
+    stage('Maven License Format Checking'){
+      steps{
+        dir("indy"){
+          sh 'mvn -B -e license:format'
+        }
+      }
+    }
     stage('Archive') {
       steps {
         echo "Archive"
