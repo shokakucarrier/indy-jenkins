@@ -127,8 +127,23 @@ pipeline {
       }
     }
     stage('Archive') {
+      when {
+        expression {
+          return params.INDY_GIT_BRANCH == 'release'
+        }
+      }
       steps {
-        archiveArtifacts artifacts: "**/*${params.INDY_MAJOR_VERSION}-rc${BUILD_NUMBER}*", fingerprint: true
+        archiveArtifacts artifacts: "**/*${params.INDY_MAJOR_VERSION}*", fingerprint: true
+      }
+    }
+    stage('Archive - SNAPSHOT') {
+      when {
+        expression {
+          return params.INDY_GIT_BRANCH != 'release' || env.PR_NO
+        }
+      }
+      steps {
+        archiveArtifacts artifacts: "**/*SNAPSHOT*", fingerprint: true
       }
     }
     stage('Build container') {
