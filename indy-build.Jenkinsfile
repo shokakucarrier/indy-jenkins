@@ -143,7 +143,7 @@ pipeline {
         }
       }
       steps {
-        archiveArtifacts artifacts: "**/*SNAPSHOT*", fingerprint: true
+        archiveArtifacts artifacts: "indy/deployments/launcher/target/*.tar.gz", fingerprint: true
       }
     }
     stage('Build container') {
@@ -241,10 +241,17 @@ pipeline {
     }
     /*stage('integration test'){
 
-    }
-    stage('stress test'){
-
     }*/
+    stage('stress test'){
+      when {
+        expression {
+          return params.FORCE_PUBLISH_IMAGE == 'true' || !env.PR_NO
+        }
+      }
+      steps{
+        build job: 'indy-stress-test', propagate: true, wait: true, parameters: [string(name: 'THREAD', value: '5'), string(name: 'LOOPS', value: '3'), string(name: 'HOSTNAME', value: 'indy-perf-nos-automation.cloud.paas.psi.redhat.com'), string(name: 'PORT', value: '80')]
+      }
+    }
     stage('deploy indy artifact'){
       when {
         expression {
@@ -260,7 +267,7 @@ pipeline {
     stage('Tag image in ImageStream'){
       when {
         expression {
-          return "${params.INDY_DEV_IMAGE_TAG}" && params.TAG_INTO_IMAGESTREAM == "true" && (params.FORCE_PUBLISH_IMAGE == 'true' || !env.PR_NO)
+          return "${params.INDY_DEV_IMAGE_TAG}" && params.TAG_INTO_IMAGESTREAM == 'true' && (params.FORCE_PUBLISH_IMAGE == 'true' || !env.PR_NO)
         }
       }
       steps{
