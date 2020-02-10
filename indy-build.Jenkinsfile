@@ -205,7 +205,7 @@ pipeline {
     stage('tag and push image to quay'){
       when {
         expression {
-          return params.FORCE_PUBLISH_IMAGE == 'true' || !env.PR_NO
+          return params.FORCE_PUBLISH_IMAGE == true || !env.PR_NO
         }
       }
       steps{
@@ -226,7 +226,7 @@ pipeline {
     stage('deploy test environment'){
       when {
         expression {
-          return params.FORCE_PUBLISH_IMAGE == 'true' || !env.PR_NO
+          return params.FORCE_PUBLISH_IMAGE == true || !env.PR_NO
         }
       }
       steps{
@@ -246,7 +246,7 @@ pipeline {
     stage('stress test'){
       when {
         expression {
-          return params.FORCE_PUBLISH_IMAGE == 'true' || !env.PR_NO
+          return params.FORCE_PUBLISH_IMAGE == true || !env.PR_NO
         }
       }
       steps{
@@ -256,7 +256,7 @@ pipeline {
     stage('deploy indy artifact'){
       when {
         expression {
-          return params.FORCE_PUBLISH_IMAGE == 'true' || !env.PR_NO
+          return params.FORCE_PUBLISH_IMAGE == true || !env.PR_NO
         }
       }
       steps {
@@ -268,7 +268,7 @@ pipeline {
     stage('Tag image in ImageStream'){
       when {
         expression {
-          return "${params.INDY_DEV_IMAGE_TAG}" && params.TAG_INTO_IMAGESTREAM == 'true' && (params.FORCE_PUBLISH_IMAGE == 'true' || !env.PR_NO)
+          return "${params.INDY_DEV_IMAGE_TAG}" && params.TAG_INTO_IMAGESTREAM == true && (params.FORCE_PUBLISH_IMAGE == true || !env.PR_NO)
         }
       }
       steps{
