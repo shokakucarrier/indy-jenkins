@@ -102,6 +102,7 @@ pipeline {
         echo 'Executing build for : ${params.INDY_GIT_REPO} ${params.INDY_MAJOR_VERSION}'
         cd indy
         mvn versions:set -DnewVersion=${params.INDY_MAJOR_VERSION}
+        #mvn enforcer:enforce
         """
       }
     }
@@ -112,17 +113,17 @@ pipeline {
         }
       }
     }
-    stage('Function test'){
-      steps {
-        dir("indy"){
-          sh 'mvn -B -V verify -Prun-its -Pci'
-        }
-      }
-    }
     stage('Maven License Format Checking'){
       steps{
         dir("indy"){
           sh 'mvn -B -e license:format'
+        }
+      }
+    }
+    stage('Function test'){
+      steps {
+        dir("indy"){
+          sh 'mvn -B -V verify -Prun-its -Pci'
         }
       }
     }
