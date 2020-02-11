@@ -43,8 +43,6 @@ pipeline {
               memory: 8Gi
               cpu: 4000m
           volumeMounts:
-          - mountPath: /home/jenkins/.m2
-            name: volume-1
           - mountPath: /home/jenkins/sonatype
             name: volume-0
           - mountPath: /mnt/ocp
@@ -55,10 +53,6 @@ pipeline {
           secret:
             defaultMode: 420
             secretName: sonatype-secrets
-        - name: volume-1
-          secret:
-            defaultMode: 420
-            secretName: maven-secrets
         - name: volume-2
           configMap:
             defaultMode: 420
@@ -79,6 +73,11 @@ pipeline {
     stage('git checkout') {
       steps{
         script{
+          sh """
+          mkdir -p /home/jenkins/.m2
+          cp ./settings.xml /home/jenkins/.m2
+          sed 's/{{_BUILD_ID}}/${params.INDY_MAJOR_VERSION}-jenkins-${env.BUILD_NUMBER}/g' /home/jenkins/.m2/settings.xml
+          """
           checkout([$class      : 'GitSCM', branches: [[name: params.INDY_GIT_BRANCH]], doGenerateSubmoduleConfigurations: false,
                     extensions  : [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'indy'], [$class: 'CleanCheckout']], submoduleCfg: [],
                     userRemoteConfigs: [[url: params.INDY_GIT_REPO, refspec: '+refs/heads/*:refs/remotes/origin/* +refs/pull/*/head:refs/remotes/origin/pull/*/head']]])
