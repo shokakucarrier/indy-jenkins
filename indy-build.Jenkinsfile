@@ -214,7 +214,8 @@ pipeline {
             def processed = openshift.process(template,
               '-p', "TARBALL_URL=${env.TARBALL_URL}",
               '-p', "DATA_TARBALL_URL=${env.DATA_TARBALL_URL}",
-              '-p', "QUAY_TAG=${params.INDY_DEV_IMAGE_TAG}"
+              //'-p', "QUAY_TAG=${params.INDY_DEV_IMAGE_TAG}"
+              '-p', "QUAY_TAG=latest"
             )
             def build = c3i.buildAndWait(script: this, objs: processed)
             echo 'Publish build succeeds!'

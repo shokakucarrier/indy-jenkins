@@ -13,7 +13,7 @@ This is Jenkins CI script store for indy product and library
 |JENKINS_AGENT_CLOUD_NAME|String|openshift|
 |INDY_GIT_BRANCH|String|master|
 |INDY_GIT_REPO|String|https://github.com/Commonjava/indy|
-|INDY_MAJOR_VERSION|String|1.10.0|
+|INDY_MAJOR_VERSION|String|2.0.0|
 |INDY_IMAGESTREAM_NAME|String|indy_binary|
 |INDY_IMAGESTREAM_NAMESPACE|String|nos-automation|
 |INDY_DEV_IMAGE_TAG|String|latest|
