@@ -121,6 +121,11 @@ pipeline {
       }
     }
     stage('Function test'){
+      when {
+        expression {
+          return params.FUNCTIONAL_TEST == true
+        }
+      }
       steps {
         dir("indy"){
           sh 'mvn -B -V verify -Prun-its -Pci'
@@ -216,7 +221,7 @@ pipeline {
               '-p', "TARBALL_URL=${env.TARBALL_URL}",
               '-p', "DATA_TARBALL_URL=${env.DATA_TARBALL_URL}",
               //'-p', "QUAY_TAG=${params.INDY_DEV_IMAGE_TAG}"
-              '-p', "QUAY_TAG=latest"
+              '-p', "QUAY_TAG=${params.QUAY_IMAGE_TAG}"
             )
             def build = c3i.buildAndWait(script: this, objs: processed)
             echo 'Publish build succeeds!'
@@ -247,7 +252,7 @@ pipeline {
     stage('stress test'){
       when {
         expression {
-          return params.FORCE_PUBLISH_IMAGE == true || !env.PR_NO
+          return params.STRESS_TEST == true && (params.FORCE_PUBLISH_IMAGE == true || !env.PR_NO)
         }
       }
       steps{

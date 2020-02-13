@@ -22,6 +22,8 @@ This is Jenkins CI script store for indy product and library
 |MAIL_ADDRESS|String|liyu@redhat.com|
 |TOWER_HOST|String|''|
 |TOWER_TEMPLATE_NUMBER|String|850|
+|FUNCTIONAL_TEST|Boolean|true|
+|STRESS_TEST|Boolean|true|
 
 _indy branch can also be git commit reference_
 
