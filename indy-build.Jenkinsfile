@@ -73,6 +73,10 @@ pipeline {
     stage('git checkout') {
       steps{
         script{
+          sh """
+          mkdir -p /home/jenkins/.m2
+          mv ./settings.xml /home/jenkins/.m2/settings.xml
+          """
           checkout([$class      : 'GitSCM', branches: [[name: params.INDY_GIT_BRANCH]], doGenerateSubmoduleConfigurations: false,
                     extensions  : [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'indy'], [$class: 'CleanCheckout']], submoduleCfg: [],
                     userRemoteConfigs: [[url: params.INDY_GIT_REPO, refspec: '+refs/heads/*:refs/remotes/origin/* +refs/pull/*/head:refs/remotes/origin/pull/*/head']]])
@@ -95,8 +99,6 @@ pipeline {
         sh """#!/bin/bash
         echo 'Executing build for : ${params.INDY_GIT_REPO} ${params.INDY_MAJOR_VERSION}'
         curl -X POST "http://indy-infra-nos-automation.cloud.paas.psi.redhat.com/api/admin/stores/maven/hosted" -H "accept: application/json" -H "Content-Type: application/json" -d "{ \"key\": \"maven:hosted:${params.INDY_MAJOR_VERSION}-jenkins-${env.BUILD_NUMBER}\", \"disabled\": false, \"doctype\": \"hosted\", \"name\": \"${params.INDY_MAJOR_VERSION}-jenkins-${env.BUILD_NUMBER}\", \"allow_releases\": true}"
-        mkdir -p /home/jenkins/.m2
-        cp ./settings.xml /home/jenkins/.m2
         sed 's/{{_BUILD_ID}}/${params.INDY_MAJOR_VERSION}-jenkins-${env.BUILD_NUMBER}/g' /home/jenkins/.m2/settings.xml
         cd indy
         mvn versions:set -DnewVersion=${params.INDY_MAJOR_VERSION}
