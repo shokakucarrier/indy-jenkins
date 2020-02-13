@@ -236,7 +236,7 @@ pipeline {
           curl -k -u ${USERNAME}:${PASSWORD} \
           -H 'Content-Type: application/json' \
           --data '{}' \
-          -X POST ${params.TOWER_HOST}api/v2/job_templates/850/launch/
+          -X POST ${params.TOWER_HOST}api/v2/job_templates/${params.TOWER_TEMPLATE_NUMBER}/launch/
           """
         }
       }
@@ -262,7 +262,10 @@ pipeline {
       }
       steps {
         dir("indy"){
-          sh 'mvn help:effective-settings -B -V -DskipTests=true deploy -e'
+          sh """
+          mvn help:effective-settings -B -V -DskipTests=true deploy -e
+          curl -X POST "http://indy-infra-nos-automation.cloud.paas.psi.redhat.com/api/promotion/paths/promote" -H "accept: application/json" -H "Content-Type: application/json" -d "{\"source\": \"maven:hosted:${params.INDY_MAJOR_VERSION}-jenkins-${env.BUILD_NUMBER}\", \"target\": \"maven:hosted:local-deployments\"}"
+          """
         }
       }
     }
