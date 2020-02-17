@@ -66,17 +66,31 @@ pipeline {
   stages {
     stage('git checkout') {
       steps{
+        sh """
+        mkdir -p /home/jenkins/.m2
+        mv ./settings.xml /home/jenkins/.m2/settings.xml
+        """
         checkout([$class      : 'GitSCM', branches: [[name: params.LIB_GIT_BRANCH]], doGenerateSubmoduleConfigurations: false,
                   extensions  : [[$class: 'RelativeTargetDirectory', relativeTargetDir: params.LIB_NAME], [$class: 'CleanCheckout']],
                   submoduleCfg: [], userRemoteConfigs: [[url: params.LIB_GIT_REPO]]])
+
+        env.PR_NO = getPrNo(params.LIB_GIT_BRANCH)
+        env.TEMP_TAG = params.LIB_MAJOR_VERSION + '-jenkins-' + currentBuild.id
       }
     }
     stage('Get Version'){
+      when {
+        expression {
+          return params.LIB_GIT_BRANCH == 'release'
+        }
+      }
       steps{
         sh """# /bin/bash
-        echo 'Executing build for : ${params.LIB_GIT_REPO} ${params.LIB_MAJOR_VERSION}-rc${BUILD_NUMBER}'
+        echo 'Executing build for : ${params.LIB_GIT_REPO} ${params.LIB_MAJOR_VERSION}'
+        curl -X POST "http://indy-infra-nos-automation.cloud.paas.psi.redhat.com/api/admin/stores/maven/hosted" -H "accept: application/json" -H "Content-Type: application/json" -d "{ \"key\": \"maven:hosted:${params.LIB_NAME}-${params.LIB_MAJOR_VERSION}-jenkins-${env.BUILD_NUMBER}\", \"disabled\": false, \"doctype\": \"hosted\", \"name\": \"${params.LIB_NAME}-${params.LIB_MAJOR_VERSION}-jenkins-${env.BUILD_NUMBER}\", \"allow_releases\": true}"
+        sed 's/{{_BUILD_ID}}/${params.LIB_NAME}-${params.LIB_MAJOR_VERSION}-jenkins-${env.BUILD_NUMBER}/g' /home/jenkins/.m2/settings.xml
         cd ${params.LIB_NAME}
-        mvn versions:set -DnewVersion=${params.LIB_MAJOR_VERSION}-rc${BUILD_NUMBER}
+        mvn versions:set -DnewVersion=${params.LIB_MAJOR_VERSION}
         """
       }
     }
@@ -109,4 +123,47 @@ pipeline {
       }
     }
   }
+  post {
+    success {
+      script {
+        echo "SUCCEED"
+      }
+    }
+    failure {
+      script {
+        if (params.LIB_GIT_BRANCH == 'release'){
+          try{
+            sh """
+            curl -X DELETE "http://indy-infra-nos-automation.cloud.paas.psi.redhat.com/api/admin/stores/maven/hosted/${params.LIB_NAME}-${params.LIB_MAJOR_VERSION}-jenkins-${env.BUILD_NUMBER}" -H "accept: application/json"
+            """
+          }catch(e){
+            echo "Error teardown hosted repo"
+          }
+        }
+        if (params.MAIL_ADDRESS){
+          try {
+            sendBuildStatusEmail('failed')
+          } catch (e) {
+            echo "Error sending email: ${e}"
+          }
+        }
+      }
+    }
+  }
+}
+@NonCPS
+def getPrNo(branch) {
+  def prMatch = branch =~ /^(?:.+\/)?pull\/(\d+)\/head$/
+  return prMatch ? prMatch[0][1] : ''
+}
+
+def sendBuildStatusEmail(String status) {
+  def recipient = params.MAIL_ADDRESS
+  def subject = "Jenkins job ${env.JOB_NAME} #${env.BUILD_NUMBER} ${status}."
+  def body = "Build URL: ${env.BUILD_URL}"
+  if (env.PR_NO) {
+    subject = "Jenkins job ${env.JOB_NAME}, PR #${env.PR_NO} ${status}."
+    body += "\nPull Request: ${env.PR_URL}"
+  }
+  emailext to: recipient, subject: subject, body: body
 }
