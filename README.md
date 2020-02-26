@@ -24,6 +24,7 @@ This is Jenkins CI script store for indy product and library
 |TOWER_TEMPLATE_NUMBER|String|850|
 |FUNCTIONAL_TEST|Boolean|true|
 |STRESS_TEST|Boolean|true|
+|QUAY_IMAGE_TAG|String|latest|
 
 _indy branch can also be git commit reference_
 

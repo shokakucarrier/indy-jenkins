@@ -102,7 +102,7 @@ pipeline {
         sed 's/{{_BUILD_ID}}/${params.INDY_MAJOR_VERSION}-jenkins-${env.BUILD_NUMBER}/g' /home/jenkins/.m2/settings.xml
         cd indy
         mvn versions:set -DnewVersion=${params.INDY_MAJOR_VERSION}
-        #mvn enforcer:enforce
+        mvn enforcer:enforce
         """
       }
     }
