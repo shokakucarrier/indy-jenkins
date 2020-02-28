@@ -40,8 +40,6 @@ pipeline {
               memory: 8Gi
               cpu: 4000m
           volumeMounts:
-          - mountPath: /home/jenkins/.m2
-            name: volume-1
           - mountPath: /home/jenkins/sonatype
             name: volume-0
           - mountPath: /mnt/ocp
@@ -52,10 +50,6 @@ pipeline {
           secret:
             defaultMode: 420
             secretName: sonatype-secrets
-        - name: volume-1
-          secret:
-            defaultMode: 420
-            secretName: maven-secrets
         - name: volume-2
           configMap:
             defaultMode: 420
