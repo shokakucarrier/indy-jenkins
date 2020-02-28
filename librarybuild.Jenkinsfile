@@ -105,9 +105,14 @@ pipeline {
       }
     }
     stage('Archive') {
+      when{
+        expression {
+          return params.LIB_GIT_BRANCH == 'release'
+        }
+      }
       steps {
         echo "Archive"
-        archiveArtifacts artifacts: "**/*${params.LIB_MAJOR_VERSION}-rc${BUILD_NUMBER}*", fingerprint: true
+        archiveArtifacts artifacts: "**/*${params.LIB_MAJOR_VERSION}*", fingerprint: true
       }
     }
     stage('Deploy') {
