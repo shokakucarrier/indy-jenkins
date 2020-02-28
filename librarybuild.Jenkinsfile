@@ -66,16 +66,18 @@ pipeline {
   stages {
     stage('git checkout') {
       steps{
-        sh """
-        mkdir -p /home/jenkins/.m2
-        mv ./settings.xml /home/jenkins/.m2/settings.xml
-        """
-        checkout([$class      : 'GitSCM', branches: [[name: params.LIB_GIT_BRANCH]], doGenerateSubmoduleConfigurations: false,
-                  extensions  : [[$class: 'RelativeTargetDirectory', relativeTargetDir: params.LIB_NAME], [$class: 'CleanCheckout']],
-                  submoduleCfg: [], userRemoteConfigs: [[url: params.LIB_GIT_REPO]]])
+        script{
+          sh """
+          mkdir -p /home/jenkins/.m2
+          mv ./settings.xml /home/jenkins/.m2/settings.xml
+          """
+          checkout([$class      : 'GitSCM', branches: [[name: params.LIB_GIT_BRANCH]], doGenerateSubmoduleConfigurations: false,
+                    extensions  : [[$class: 'RelativeTargetDirectory', relativeTargetDir: params.LIB_NAME], [$class: 'CleanCheckout']],
+                    submoduleCfg: [], userRemoteConfigs: [[url: params.LIB_GIT_REPO]]])
 
-        env.PR_NO = getPrNo(params.LIB_GIT_BRANCH)
-        env.TEMP_TAG = params.LIB_MAJOR_VERSION + '-jenkins-' + currentBuild.id
+          env.PR_NO = getPrNo(params.LIB_GIT_BRANCH)
+          env.TEMP_TAG = params.LIB_MAJOR_VERSION + '-jenkins-' + currentBuild.id
+        }
       }
     }
     stage('Get Version'){
