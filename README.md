@@ -14,6 +14,7 @@ This is Jenkins CI script store for indy product and library
 |INDY_GIT_BRANCH|String|master|
 |INDY_GIT_REPO|String|https://github.com/Commonjava/indy|
 |INDY_MAJOR_VERSION|String|2.0.0|
+|INDY_PREPARE_RELEASE|Boolean|false|
 |INDY_IMAGESTREAM_NAME|String|indy_binary|
 |INDY_IMAGESTREAM_NAMESPACE|String|nos-automation|
 |INDY_DEV_IMAGE_TAG|String|latest|
@@ -27,6 +28,8 @@ This is Jenkins CI script store for indy product and library
 |QUAY_IMAGE_TAG|String|latest|
 
 _indy branch can also be git commit reference_
+
+_indy major version is optional, only needed when release a new version_
 
 _Jekins agent cloud name should be kubernetes plugin cluser name_
 
