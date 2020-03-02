@@ -27,15 +27,28 @@ This is Jenkins CI script store for indy product and library
 |STRESS_TEST|Boolean|true|
 |QUAY_IMAGE_TAG|String|latest|
 
-_indy branch can also be git commit reference_
+_indy branch can also be git commit reference e.g.:commit id or origin/pull/1507/head_
 
 _indy major version is optional, only needed when release a new version_
 
-_Jekins agent cloud name should be kubernetes plugin cluser name_
-
+* Jekins agent cloud name should be kubernetes plugin cluser name
 * Jenkins Credential Username and Password Tower_Auth is needed and script can access it.
+* Tower host is the jenkins tower used to deploy a test envrioment.
+* Skipp maven functional test and jmeter stress test by disable FUNCTIONAL_TEST and STRESS_TEST
 
 _850 is templpate id of nos-automation - deploy-indy-perf_
+
+**release-master required**
+
+|Parameters      |Type |Default Value                                          |
+|----------------|-----|-------------------------------------------------------|
+|INDY_GIT_BRANCH|String|master|
+|INDY_GIT_REPO|String|https://github.com/Commonjava/indy|
+|INDY_MAJOR_VERSION|String|2.0.0|
+|MAIL_ADDRESS|String|liyu@redhat.com|
+
+_indy git branch should be used as a commit id, but proceed with careful, as the rebase and pull request stuff_
+
 
 **Autotest required**
 

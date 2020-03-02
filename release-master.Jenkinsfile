@@ -88,11 +88,19 @@ pipeline {
     }
     stage('Get Version'){
       steps{
-        sh """#!/bin/bash
-        cd indy
-        mvn versions:set -DnewVersion=${params.INDY_MAJOR_VERSION}
-        mvn enforcer:enforce
-        """
+        dir('indy'){
+          script{
+            def INDY_SNAPSHOT_DEPENDENCY = sh (
+                  script: 'mvn dependency:tree -Dincludes=:::*-SNAPSHOT',
+                  returnStdout: true
+            ).trim()
+            sh """#!/bin/bash
+            cd indy
+            mvn versions:set -DnewVersion=${params.INDY_MAJOR_VERSION}
+            mvn enforcer:enforce
+            """
+          }
+        }
       }
     }
     stage('trigger build with same setting'){
@@ -176,6 +184,9 @@ def sendBuildStatusEmail(String status) {
   def recipient = params.MAIL_ADDRESS
   def subject = "Jenkins job ${env.JOB_NAME} #${env.BUILD_NUMBER} ${status}."
   def body = "Build URL: ${env.BUILD_URL}"
+  if (INDY_SNAPSHOT_DEPENDENCY) {
+    body += "\nsnapshot release depenency ${INDY_SNAPSHOT_DEPENDENCY}"
+  }
   if (env.PR_NO) {
     subject = "Jenkins job ${env.JOB_NAME}, PR #${env.PR_NO} ${status}."
     body += "\nPull Request: ${env.PR_URL}"
