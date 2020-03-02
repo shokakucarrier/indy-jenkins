@@ -103,7 +103,7 @@ pipeline {
         }
       }
     }
-    stage('trigger build with same setting'){
+    stage('Trigger build with same setting'){
       steps{
         build job: 'indy-playground', propagate: true, wait: true, parameters: [string(name: 'INDY_GIT_BRANCH', value: "${params.INDY_GIT_BRANCH}"),
         string(name: 'INDY_MAJOR_VERSION', value: "${params.INDY_MAJOR_VERSION}"),
@@ -116,14 +116,20 @@ pipeline {
         ]
       }
     }
-    stage('issue PR to release branch'){
+    stage('Push tag&changes to release branch'){
       steps{
         script{
-          echo "sending PR to release branch base on ${params.INDY_GIT_BRANCH} commit: ${env.INDY_GIT_COMMIT}"
+          dir('indy'){
+            sh """
+            git commit -am "prepare release indy-parent-${INDY_MAJOR_VERSION}"
+            git tag indy-parent-${INDY_MAJOR_VERSION}
+            git push origin release
+            """
+          }
         }
       }
     }
-    stage('manual accept PR and proceed'){
+    /*stage('manual accept PR and proceed'){
       steps{
         script{
           echo "waiting to proceed, please review Pull Request and manually accept it on GitHub"
@@ -138,7 +144,7 @@ pipeline {
           }
         }
       }
-    }
+    }*/
     stage('trigger build of release branch'){
       steps{
         build job: 'indy-release', propagate: true, wait: true, parameters: [string(name: 'INDY_GIT_BRANCH', value: "release"),
