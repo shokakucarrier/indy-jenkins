@@ -95,7 +95,6 @@ pipeline {
                   returnStdout: true
             ).trim()
             sh """#!/bin/bash
-            cd indy
             mvn versions:set -DnewVersion=${params.INDY_MAJOR_VERSION}
             mvn enforcer:enforce
             """
@@ -106,6 +105,7 @@ pipeline {
     stage('Trigger build with same setting'){
       steps{
         build job: 'indy-playground', propagate: true, wait: true, parameters: [string(name: 'INDY_GIT_BRANCH', value: "${params.INDY_GIT_BRANCH}"),
+        string(name: 'INDY_GIT_REPO', value: "${params.INDY_GIT_REPO}"),
         string(name: 'INDY_MAJOR_VERSION', value: "${params.INDY_MAJOR_VERSION}"),
         string(name: 'INDY_DEV_IMAGE_TAG', value: "latest"),
         boolean(name: 'TAG_INTO_IMAGESTREAM', value: true),
@@ -119,35 +119,27 @@ pipeline {
     stage('Push tag&changes to release branch'){
       steps{
         script{
-          dir('indy'){
-            sh """
-            git commit -am "prepare release indy-parent-${INDY_MAJOR_VERSION}"
-            git tag indy-parent-${INDY_MAJOR_VERSION}
-            git push origin release
-            """
+          withCredentials([usernamePassword(credentialsId:'GItHub-Bot', passwordVariable:'BOT_PASSWORD', usernameVariable:'BOT_USERNAME')]) {
+            dir('indy'){
+              sh """
+              git config --global user.email "${params.BOT_EMAIL}"
+              git config --global user.name "${BOT_USERNAME}"
+              git commit -am "prepare release indy-parent-${params.INDY_MAJOR_VERSION}"
+              git tag indy-parent-${params.INDY_MAJOR_VERSION}
+              git checkout release
+              git merge ${params.INDY_GIT_BRANCH}
+              export HOSTNAME=`python3 -c 'print("${params.INDY_GIT_REPO}".split("//")[1])'`
+              git push https://${BOT_USERNAME}:${BOT_PASSWORD}@${HOSTNAME} --all
+              """
+            }
           }
         }
       }
     }
-    /*stage('manual accept PR and proceed'){
-      steps{
-        script{
-          echo "waiting to proceed, please review Pull Request and manually accept it on GitHub"
-          userInput = input(
-            id: 'userInput', message: "Please enter a test suite to run:",
-            parameters:[
-              choice(name: 'proceed', choices: ['OK', 'EVACUATE'], description: "You can also evacuate this build by kill it now"),
-            ]
-          )
-          if (userInput.proceed == 'EVACUATE'){
-              currentBuild.result = 'FAILURE'
-          }
-        }
-      }
-    }*/
     stage('trigger build of release branch'){
       steps{
         build job: 'indy-release', propagate: true, wait: true, parameters: [string(name: 'INDY_GIT_BRANCH', value: "release"),
+        string(name: 'INDY_GIT_REPO', value: "${params.INDY_GIT_REPO}"),
         string(name: 'INDY_DEV_IMAGE_TAG', value: "latest-release"),
         boolean(name: 'TAG_INTO_IMAGESTREAM', value: true),
         boolean(name: 'FORCE_PUBLISH_IMAGE', value: true),
