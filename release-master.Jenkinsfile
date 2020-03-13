@@ -119,7 +119,7 @@ pipeline {
     stage('Push tag&changes to release branch'){
       steps{
         script{
-          withCredentials([usernamePassword(credentialsId:'GItHub-Bot', passwordVariable:'BOT_PASSWORD', usernameVariable:'BOT_USERNAME')]) {
+          withCredentials([usernamePassword(credentialsId:'GitHub-Bot', passwordVariable:'BOT_PASSWORD', usernameVariable:'BOT_USERNAME')]) {
             dir('indy'){
               sh """
               git config --global user.email "${params.BOT_EMAIL}"
