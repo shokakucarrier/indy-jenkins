@@ -83,7 +83,6 @@ pipeline {
         dir('indy'){
           sh """#!/bin/bash
           mvn versions:set -DnewVersion=${params.INDY_MAJOR_VERSION}
-          mvn enforcer:enforce
           """
         }
       }
@@ -153,11 +152,6 @@ pipeline {
     failure {
       script {
         dir('indy'){
-          sh 'git reset --hard'
-          env.INDY_SNAPSHOT_DEPENDENCY = sh (
-            script: 'mvn -s ../settings.xml dependency:tree -Dincludes=:::*-SNAPSHOT -rf :indy-launcher',
-            returnStdout: true
-          ).trim()
           if (params.MAIL_ADDRESS){
             try {
               sendBuildStatusEmail('failed')
@@ -175,9 +169,6 @@ def sendBuildStatusEmail(String status) {
   def recipient = params.MAIL_ADDRESS
   def subject = "Jenkins job ${env.JOB_NAME} #${env.BUILD_NUMBER} ${status}."
   def body = "Build URL: ${env.BUILD_URL}"
-  if (env.INDY_SNAPSHOT_DEPENDENCY) {
-    body += "\nsnapshot release depenency ${INDY_SNAPSHOT_DEPENDENCY}"
-  }
   if (env.PR_NO) {
     subject = "Jenkins job ${env.JOB_NAME}, PR #${env.PR_NO} ${status}."
     body += "\nPull Request: ${env.PR_URL}"
