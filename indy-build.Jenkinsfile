@@ -272,20 +272,20 @@ pipeline {
     stage('deploy indy artifact'){
       when {
         expression {
-          return params.FORCE_PUBLISH_IMAGE == true || !env.PR_NO
+          return params.INDY_PREPARE_RELEASE != true && (params.FORCE_PUBLISH_IMAGE == true || !env.PR_NO)
         }
       }
       steps {
         dir("indy"){
           script{
-            sh """
-            mvn help:effective-settings -B -V -DskipTests=true deploy -e
-            """
-            if (params.INDY_GIT_BRANCH == 'release' || params.INDY_PREPARE_RELEASE == true){
+            if (params.INDY_GIT_BRANCH == 'release'){
               sh """
               curl -X POST "http://indy-infra-nos-automation.cloud.paas.psi.redhat.com/api/promotion/paths/promote" -H "accept: application/json" -H "Content-Type: application/json" -d "{\"source\": \"maven:hosted:${params.INDY_MAJOR_VERSION}-jenkins-${env.BUILD_NUMBER}\", \"target\": \"maven:hosted:local-deployments\"}"
               """
             }
+            sh """
+            mvn help:effective-settings -B -V -DskipTests=true deploy -e
+            """
           }
         }
       }

@@ -15,30 +15,21 @@ pipeline {
       spec:
         containers:
         - name: jnlp
-          image: registry.redhat.io/openshift3/jenkins-agent-maven-35-rhel7:v3.11
+          image: quay.io/kaine/indy-stress-tester:latest
           imagePullPolicy: Always
           tty: true
           env:
-          - name: JAVA_TOOL_OPTIONS
-            value: '-XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap -Dsun.zip.disableMemoryMapping=true -Xms1024m -Xmx4g'
-          - name: MAVEN_OPTS
-            value: '-Xmx8g -Xms1024m -XX:MaxPermSize=512m -Xss8m'
           - name: USER
             value: 'jenkins-k8s-config'
-          - name: IMG_BUILD_HOOKS
-            valueFrom:
-              secretKeyRef:
-                key: img-build-hooks.json
-                name: img-build-hooks-secrets
           - name: HOME
             value: /home/jenkins
           resources:
             requests:
-              memory: 4Gi
-              cpu: 2000m
+              memory: 1Gi
+              cpu: 1000m
             limits:
-              memory: 8Gi
-              cpu: 4000m
+              memory: 1Gi
+              cpu: 1000m
           volumeMounts:
           - mountPath: /home/jenkins/sonatype
             name: volume-0
@@ -64,15 +55,14 @@ pipeline {
   environment {
     PIPELINE_NAMESPACE = readFile('/run/secrets/kubernetes.io/serviceaccount/namespace').trim()
     PIPELINE_USERNAME = sh(returnStdout: true, script: 'id -un').trim()
-    GITHUB_API_URL='https://api.github.com/repos/Commonjava/indy'
   }
   stages {
     stage('git checkout') {
       steps{
         script{
           checkout([$class      : 'GitSCM', branches: [[name: params.INDY_GIT_BRANCH]], doGenerateSubmoduleConfigurations: false,
-                    extensions  : [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'indy'], [$class: 'CleanCheckout']], submoduleCfg: [],
-                    userRemoteConfigs: [[url: params.INDY_GIT_REPO, refspec: '+refs/heads/*:refs/remotes/origin/* +refs/pull/*/head:refs/remotes/origin/pull/*/head']]])
+                    extensions  : [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'indy']], submoduleCfg: [],
+                    userRemoteConfigs: [[url: params.INDY_GIT_REPO]]])
 
           echo "Prepare the release of ${params.INDY_GIT_REPO} branch: ${params.INDY_GIT_BRANCH}"
         }
@@ -82,6 +72,7 @@ pipeline {
       steps{
         dir('indy'){
           sh """#!/bin/bash
+          git checkout ${params.INDY_GIT_BRANCH}
           mvn versions:set -DnewVersion=${params.INDY_MAJOR_VERSION}
           """
         }
@@ -113,8 +104,8 @@ pipeline {
               git tag indy-parent-${params.INDY_MAJOR_VERSION}
               git checkout release
               git merge ${params.INDY_GIT_BRANCH}
-              export HOSTNAME=`python3 -c 'print("${params.INDY_GIT_REPO}".split("//")[1])'`
-              git push https://${BOT_USERNAME}:${BOT_PASSWORD}@${HOSTNAME} --all
+              git push https://${BOT_USERNAME}:${BOT_PASSWORD}@$`python3 -c 'print("${params.INDY_GIT_REPO}".split("//")[1])'` --all
+              git push https://${BOT_USERNAME}:${BOT_PASSWORD}@$`python3 -c 'print("${params.INDY_GIT_REPO}".split("//")[1])'` indy-parent-${params.INDY_MAJOR_VERSION}
               """
             }
           }
