@@ -77,12 +77,8 @@ pipeline {
           checkout([$class      : 'GitSCM', branches: [[name: params.INDY_GIT_BRANCH]], doGenerateSubmoduleConfigurations: false,
                     extensions  : [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'indy'], [$class: 'CleanCheckout']], submoduleCfg: [],
                     userRemoteConfigs: [[url: params.INDY_GIT_REPO, refspec: '+refs/heads/*:refs/remotes/origin/* +refs/pull/*/head:refs/remotes/origin/pull/*/head']]])
-          env.INDY_GIT_COMMIT = sh(returnStdout: true, script: 'git rev-parse HEAD').trim()
 
-          echo "Prepare the release of ${params.INDY_GIT_BRANCH} commit: ${env.INDY_GIT_COMMIT}"
-
-          env.PR_NO = getPrNo(params.INDY_GIT_BRANCH)
-          env.TEMP_TAG = params.INDY_MAJOR_VERSION + '-jenkins-' + currentBuild.id
+          echo "Prepare the release of ${params.INDY_GIT_BRANCH} branch: ${params.INDY_GIT_BRANCH}"
         }
       }
     }
