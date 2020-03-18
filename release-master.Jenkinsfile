@@ -78,23 +78,17 @@ pipeline {
                     extensions  : [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'indy'], [$class: 'CleanCheckout']], submoduleCfg: [],
                     userRemoteConfigs: [[url: params.INDY_GIT_REPO, refspec: '+refs/heads/*:refs/remotes/origin/* +refs/pull/*/head:refs/remotes/origin/pull/*/head']]])
 
-          echo "Prepare the release of ${params.INDY_GIT_BRANCH} branch: ${params.INDY_GIT_BRANCH}"
+          echo "Prepare the release of ${params.INDY_GIT_REPO} branch: ${params.INDY_GIT_BRANCH}"
         }
       }
     }
     stage('Get Version'){
       steps{
         dir('indy'){
-          script{
-            def INDY_SNAPSHOT_DEPENDENCY = sh (
-                  script: 'mvn dependency:tree -Dincludes=:::*-SNAPSHOT',
-                  returnStdout: true
-            ).trim()
-            sh """#!/bin/bash
-            mvn versions:set -DnewVersion=${params.INDY_MAJOR_VERSION}
-            mvn enforcer:enforce
-            """
-          }
+          sh """#!/bin/bash
+          mvn versions:set -DnewVersion=${params.INDY_MAJOR_VERSION}
+          mvn enforcer:enforce
+          """
         }
       }
     }
@@ -162,11 +156,17 @@ pipeline {
     }
     failure {
       script {
-        if (params.MAIL_ADDRESS){
-          try {
-            sendBuildStatusEmail('failed')
-          } catch (e) {
-            echo "Error sending email: ${e}"
+        dir('indy'){
+          env.INDY_SNAPSHOT_DEPENDENCY = sh (
+            script: 'mvn dependency:tree -Dincludes=:::*-SNAPSHOT -rf :indy-launcher',
+            returnStdout: true
+          ).trim()
+          if (params.MAIL_ADDRESS){
+            try {
+              sendBuildStatusEmail('failed')
+            } catch (e) {
+              echo "Error sending email: ${e}"
+            }
           }
         }
       }
@@ -178,7 +178,7 @@ def sendBuildStatusEmail(String status) {
   def recipient = params.MAIL_ADDRESS
   def subject = "Jenkins job ${env.JOB_NAME} #${env.BUILD_NUMBER} ${status}."
   def body = "Build URL: ${env.BUILD_URL}"
-  if (INDY_SNAPSHOT_DEPENDENCY) {
+  if (env.INDY_SNAPSHOT_DEPENDENCY) {
     body += "\nsnapshot release depenency ${INDY_SNAPSHOT_DEPENDENCY}"
   }
   if (env.PR_NO) {
