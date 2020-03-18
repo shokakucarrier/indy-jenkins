@@ -70,10 +70,6 @@ pipeline {
     stage('git checkout') {
       steps{
         script{
-          sh """
-          mkdir -p /home/jenkins/.m2
-          mv ./settings.xml /home/jenkins/.m2/settings.xml
-          """
           checkout([$class      : 'GitSCM', branches: [[name: params.INDY_GIT_BRANCH]], doGenerateSubmoduleConfigurations: false,
                     extensions  : [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'indy'], [$class: 'CleanCheckout']], submoduleCfg: [],
                     userRemoteConfigs: [[url: params.INDY_GIT_REPO, refspec: '+refs/heads/*:refs/remotes/origin/* +refs/pull/*/head:refs/remotes/origin/pull/*/head']]])
@@ -157,8 +153,9 @@ pipeline {
     failure {
       script {
         dir('indy'){
+          sh 'git reset --hard'
           env.INDY_SNAPSHOT_DEPENDENCY = sh (
-            script: 'mvn dependency:tree -Dincludes=:::*-SNAPSHOT -rf :indy-launcher',
+            script: 'mvn -s ../settings.xml dependency:tree -Dincludes=:::*-SNAPSHOT -rf :indy-launcher',
             returnStdout: true
           ).trim()
           if (params.MAIL_ADDRESS){
