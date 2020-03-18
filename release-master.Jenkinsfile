@@ -108,11 +108,11 @@ pipeline {
         string(name: 'INDY_GIT_REPO', value: "${params.INDY_GIT_REPO}"),
         string(name: 'INDY_MAJOR_VERSION', value: "${params.INDY_MAJOR_VERSION}"),
         string(name: 'INDY_DEV_IMAGE_TAG', value: "latest"),
-        boolean(name: 'TAG_INTO_IMAGESTREAM', value: true),
-        boolean(name: 'INDY_PREPARE_RELEASE', value: true),
-        boolean(name 'FUNCTIONAL_TEST', value: true),
-        boolean(name 'STRESS_TEST', value: true),
-        boolean(name 'QUAY_IMAGE_TAG', value: 'latest')
+        booleanParam(name: 'TAG_INTO_IMAGESTREAM', value: true),
+        booleanParam(name: 'INDY_PREPARE_RELEASE', value: true),
+        booleanParam(name: 'FUNCTIONAL_TEST', value: true),
+        booleanParam(name: 'STRESS_TEST', value: true),
+        string(name: 'QUAY_IMAGE_TAG', value: 'latest')
         ]
       }
     }
@@ -141,12 +141,12 @@ pipeline {
         build job: 'indy-release', propagate: true, wait: true, parameters: [string(name: 'INDY_GIT_BRANCH', value: "release"),
         string(name: 'INDY_GIT_REPO', value: "${params.INDY_GIT_REPO}"),
         string(name: 'INDY_DEV_IMAGE_TAG', value: "latest-release"),
-        boolean(name: 'TAG_INTO_IMAGESTREAM', value: true),
-        boolean(name: 'FORCE_PUBLISH_IMAGE', value: true),
-        boolean(name: 'INDY_PREPARE_RELEASE', value: false),
-        boolean(name 'FUNCTIONAL_TEST', value: false),
-        boolean(name 'STRESS_TEST', value: false),
-        boolean(name 'QUAY_IMAGE_TAG', value: 'latest-release')
+        booleanParam(name: 'TAG_INTO_IMAGESTREAM', value: true),
+        booleanParam(name: 'FORCE_PUBLISH_IMAGE', value: true),
+        booleanParam(name: 'INDY_PREPARE_RELEASE', value: false),
+        booleanParam(name: 'FUNCTIONAL_TEST', value: false),
+        booleanParam(name: 'STRESS_TEST', value: false),
+        string(name: 'QUAY_IMAGE_TAG', value: 'latest-release')
         ]
       }
     }
