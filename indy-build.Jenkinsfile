@@ -110,7 +110,7 @@ pipeline {
       }
       steps{
         sh """#!/bin/bash
-        curl -X POST "http://indy-infra-nos-automation.cloud.paas.psi.redhat.com/api/admin/stores/maven/hosted" -H "accept: application/json" -H "Content-Type: application/json" -d "{ \"key\": \"maven:hosted:${params.INDY_MAJOR_VERSION}-jenkins-${env.BUILD_NUMBER}\", \"disabled\": false, \"doctype\": \"hosted\", \"name\": \"${params.INDY_MAJOR_VERSION}-jenkins-${env.BUILD_NUMBER}\", \"allow_releases\": true}"
+        curl -X POST "http://indy-infra-nos-automation.cloud.paas.psi.redhat.com/api/admin/stores/maven/hosted" -H "accept: application/json" -H "Content-Type: application/json" -d "{ \\"key\\": \\"maven:hosted:${params.INDY_MAJOR_VERSION}-jenkins-${env.BUILD_NUMBER}\\", \\"disabled\\": false, \\"doctype\\": \\"hosted\\", \\"name\\": \\"${params.INDY_MAJOR_VERSION}-jenkins-${env.BUILD_NUMBER}\\", \\"allow_releases\\": true}"
         sed 's/{{_BUILD_ID}}/${params.INDY_MAJOR_VERSION}-jenkins-${env.BUILD_NUMBER}/g' /home/jenkins/.m2/settings.xml
         """
       }
@@ -278,14 +278,14 @@ pipeline {
       steps {
         dir("indy"){
           script{
-            if (params.INDY_GIT_BRANCH == 'release'){
-              sh """
-              curl -X POST "http://indy-infra-nos-automation.cloud.paas.psi.redhat.com/api/promotion/paths/promote" -H "accept: application/json" -H "Content-Type: application/json" -d "{\"source\": \"maven:hosted:${params.INDY_MAJOR_VERSION}-jenkins-${env.BUILD_NUMBER}\", \"target\": \"maven:hosted:local-deployments\"}"
-              """
-            }
             sh """
             mvn help:effective-settings -B -V -DskipTests=true deploy -e
             """
+            if (params.INDY_GIT_BRANCH == 'release'){
+              sh """
+              curl -X POST "http://indy-infra-nos-automation.cloud.paas.psi.redhat.com/api/promotion/paths/promote" -H "accept: application/json" -H "Content-Type: application/json" -d "{\\"source\\": \\"maven:hosted:${params.INDY_MAJOR_VERSION}-jenkins-${env.BUILD_NUMBER}\\", \\"target\\": \\"maven:hosted:local-deployments\\"}"
+              """
+            }
           }
         }
       }
