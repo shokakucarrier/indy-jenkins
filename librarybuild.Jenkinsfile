@@ -83,8 +83,8 @@ pipeline {
       steps{
         sh """# /bin/bash
         echo 'Executing build for : ${params.LIB_GIT_REPO} ${params.LIB_MAJOR_VERSION}'
-        curl -X POST "http://indy-infra-nos-automation.cloud.paas.psi.redhat.com/api/admin/stores/maven/hosted" -H "accept: application/json" -H "Content-Type: application/json" -d "{ \"key\": \"maven:hosted:${params.LIB_NAME}-${params.LIB_MAJOR_VERSION}-jenkins-${env.BUILD_NUMBER}\", \"disabled\": false, \"doctype\": \"hosted\", \"name\": \"${params.LIB_NAME}-${params.LIB_MAJOR_VERSION}-jenkins-${env.BUILD_NUMBER}\", \"allow_releases\": true}"
-        sed 's/{{_BUILD_ID}}/${params.LIB_NAME}-${params.LIB_MAJOR_VERSION}-jenkins-${env.BUILD_NUMBER}/g' /home/jenkins/.m2/settings.xml
+        curl -X POST "http://indy-infra-nos-automation.cloud.paas.psi.redhat.com/api/admin/stores/maven/hosted" -H "accept: application/json" -H "Content-Type: application/json" -d "{ \\"key\\": \\"maven:hosted:${params.LIB_NAME}-${params.LIB_MAJOR_VERSION}-jenkins-${env.BUILD_NUMBER}\\", \\"disabled\\": false, \\"doctype\\": \\"hosted\\", \\"name\\": \\"${params.LIB_NAME}-${params.LIB_MAJOR_VERSION}-jenkins-${env.BUILD_NUMBER}\\", \\"allow_releases\\": true}"
+        sed -i 's/{{_BUILD_ID}}/${params.LIB_NAME}-${params.LIB_MAJOR_VERSION}-jenkins-${env.BUILD_NUMBER}/g' /home/jenkins/.m2/settings.xml
         cd ${params.LIB_NAME}
         mvn versions:set -DnewVersion=${params.LIB_MAJOR_VERSION}
         """
@@ -120,6 +120,11 @@ pipeline {
         dir(params.LIB_NAME){
           echo "Deploy"
           sh 'mvn help:effective-settings -B -V -DskipTests=true deploy -e'
+          if (params.LIB_GIT_BRANCH == 'release'){
+              sh """
+              curl -X POST "http://indy-infra-nos-automation.cloud.paas.psi.redhat.com/api/promotion/paths/promote" -H "accept: application/json" -H "Content-Type: application/json" -d "{\\"source\\": \\"maven:hosted:$${params.LIB_NAME}-${params.LIB_MAJOR_VERSION}-jenkins-${env.BUILD_NUMBER}\\", \\"target\\": \\"maven:hosted:local-deployments\\"}"
+              """
+          }
         }
       }
     }
