@@ -149,7 +149,7 @@ pipeline {
         }
       }
       steps {
-        archiveArtifacts artifacts: "**/*${params.INDY_MAJOR_VERSION}*", fingerprint: true
+        archiveArtifacts artifacts: "**/*${params.INDY_MAJOR_VERSION}*, **/*.jar, **/*.pom", fingerprint: true
       }
     }
     stage('Archive - SNAPSHOT') {
@@ -318,6 +318,15 @@ pipeline {
   post {
     cleanup {
       script{
+        if (params.INDY_GIT_BRANCH == 'release' || params.INDY_PREPARE_RELEASE == true){
+          try{
+            sh """
+            curl -X DELETE "http://indy-infra-nos-automation.cloud.paas.psi.redhat.com/api/admin/stores/maven/hosted/${params.INDY_MAJOR_VERSION}-jenkins-${env.BUILD_NUMBER}" -H "accept: application/json"
+            """
+          }catch(e){
+            echo "Error teardown hosted repo"
+          }
+        }
         if (env.RESULTING_TAG) {
           echo "Removing tag ${env.RESULTING_TAG} from the ImageStream..."
           openshift.withCluster() {
@@ -336,15 +345,6 @@ pipeline {
     }
     failure {
       script {
-        if (params.INDY_GIT_BRANCH == 'release' || params.INDY_PREPARE_RELEASE == true){
-          try{
-            sh """
-            curl -X DELETE "http://indy-infra-nos-automation.cloud.paas.psi.redhat.com/api/admin/stores/maven/hosted/${params.INDY_MAJOR_VERSION}-jenkins-${env.BUILD_NUMBER}" -H "accept: application/json"
-            """
-          }catch(e){
-            echo "Error teardown hosted repo"
-          }
-        }
         if (params.MAIL_ADDRESS){
           try {
             sendBuildStatusEmail('failed')
