@@ -122,7 +122,7 @@ pipeline {
           sh 'mvn help:effective-settings -B -V -DskipTests=true deploy -e'
           if (params.LIB_GIT_BRANCH == 'release'){
               sh """
-              curl -X POST "http://indy-infra-nos-automation.cloud.paas.psi.redhat.com/api/promotion/paths/promote" -H "accept: application/json" -H "Content-Type: application/json" -d "{\\"source\\": \\"maven:hosted:$${params.LIB_NAME}-${params.LIB_MAJOR_VERSION}-jenkins-${env.BUILD_NUMBER}\\", \\"target\\": \\"maven:hosted:local-deployments\\"}"
+              curl -X POST "http://indy-infra-nos-automation.cloud.paas.psi.redhat.com/api/promotion/paths/promote" -H "accept: application/json" -H "Content-Type: application/json" -d "{\\"source\\": \\"maven:hosted:${params.LIB_NAME}-${params.LIB_MAJOR_VERSION}-jenkins-${env.BUILD_NUMBER}\\", \\"target\\": \\"maven:hosted:local-deployments\\"}"
               """
           }
         }
