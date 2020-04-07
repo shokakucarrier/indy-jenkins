@@ -33,6 +33,8 @@ pipeline {
           volumeMounts:
           - mountPath: /home/jenkins/sonatype
             name: volume-0
+          - mountPath: /home/jenkins/gnupg_keys
+            name: volume-1
           - mountPath: /mnt/ocp
             name: volume-2
           workingDir: /home/jenkins
@@ -41,6 +43,10 @@ pipeline {
           secret:
             defaultMode: 420
             secretName: sonatype-secrets
+        - name: volume-1
+          configMap:
+            defaultMode: 420
+            name: gnupg
         - name: volume-2
           configMap:
             defaultMode: 420
@@ -80,7 +86,7 @@ pipeline {
     }
     stage('Trigger build with same setting'){
       steps{
-        build job: 'indy-playground', propagate: true, wait: true, parameters: [string(name: 'INDY_GIT_BRANCH', value: "${params.INDY_GIT_BRANCH}"),
+        def build_run = build job: 'indy-playground', propagate: true, wait: true, parameters: [string(name: 'INDY_GIT_BRANCH', value: "${params.INDY_GIT_BRANCH}"),
         string(name: 'INDY_GIT_REPO', value: "${params.INDY_GIT_REPO}"),
         string(name: 'INDY_MAJOR_VERSION', value: "${params.INDY_MAJOR_VERSION}"),
         string(name: 'INDY_DEV_IMAGE_TAG', value: "latest"),
@@ -90,6 +96,7 @@ pipeline {
         booleanParam(name: 'STRESS_TEST', value: true),
         string(name: 'QUAY_IMAGE_TAG', value: 'latest')
         ]
+        env.DOWNSTREAM_URL = build_run.absoluteUrl
       }
     }
     stage('Push tag&changes to release branch'){
@@ -126,13 +133,36 @@ pipeline {
         ]
       }
     }
-    /*stage('release artifact to sonatype'){
+    stage('Gather build artifact for GitHub release and signature'){
       steps{
         script{
-
+          withCredentials([string(credentialsId: '', variable: 'PASSPHRASE')]) {
+            sh"""
+            gpg --allow-secret-key-import --import /home/jenkins/gnupg_keys/private_key.txt
+            wget ${env.DOWNSTREAM_URL}/artifact/indy/deployments/launcher/target/indy-launcher-2.0.0.jar
+            wget ${env.DOWNSTREAM_URL}/artifact/indy/deployments/launcher/target/indy-launcher-2.0.0-complete.tar.gz
+            wget ${env.DOWNSTREAM_URL}/artifact/indy/deployments/launcher/target/indy-launcher-2.0.0-data.tar.gz
+            wget ${env.DOWNSTREAM_URL}/artifact/indy/deployments/launcher/target/indy-launcher-2.0.0-etc.tar.gz
+            wget ${env.DOWNSTREAM_URL}/artifact/indy/deployments/launcher/target/indy-launcher-2.0.0-skinny.tar.gz
+            gpg --clearsign --batch --passphrase="${PASSPHRASE}" indy-launcher-2.0.0.jar
+            gpg --clearsign --batch --passphrase="${PASSPHRASE}" indy-launcher-2.0.0-complete.tar.gz
+            gpg --clearsign --batch --passphrase="${PASSPHRASE}" indy-launcher-2.0.0-data.tar.gz
+            gpg --clearsign --batch --passphrase="${PASSPHRASE}" indy-launcher-2.0.0-etc.tar.gz
+            gpg --clearsign --batch --passphrase="${PASSPHRASE}" indy-launcher-2.0.0-skinny.tar.gz
+            cp indy/deployments/launcher/pom.xml ./indy-launcher-2.0.0.pom
+            gpg --clearsign --batch --passphrase="${PASSPHRASE}" indy-launcher-2.0.0.pom
+            """
+          }
         }
       }
-    }*/
+    }
+    stage('archive artifacts'){
+      steps{
+        script{
+          archiveArtifacts artifacts: "indy-launcher-*", fingerprint: true
+        }
+      }
+    }
   }
   post {
     success {
