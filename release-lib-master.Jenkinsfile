@@ -66,33 +66,18 @@ pipeline {
     stage('git checkout') {
       steps{
         script{
-          checkout([$class      : 'GitSCM', branches: [[name: params.INDY_GIT_BRANCH]], doGenerateSubmoduleConfigurations: false,
-                    extensions  : [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'indy']], submoduleCfg: [],
-                    userRemoteConfigs: [[url: params.INDY_GIT_REPO]]])
+          checkout([$class      : 'GitSCM', branches: [[name: params.LIB_GIT_BRANCH]], doGenerateSubmoduleConfigurations: false,
+                    extensions  : [[$class: 'RelativeTargetDirectory', relativeTargetDir: params.LIB_NAME]], submoduleCfg: [],
+                    userRemoteConfigs: [[url: params.LIB_GIT_REPO]]])
 
-          echo "Prepare the release of ${params.INDY_GIT_REPO} branch: ${params.INDY_GIT_BRANCH}"
+          echo "Prepare the release of ${params.LIB_GIT_REPO} branch: ${params.LIB_GIT_BRANCH}"
 
           sh """#!/bin/bash
-          cd indy
-          git checkout ${params.INDY_GIT_BRANCH}
+          cd ${params.LIB_NAME}
+          git checkout ${params.LIB_GIT_BRANCH}
           gpg --allow-secret-key-import --import /home/jenkins/gnupg_keys/private_key.txt
           """
         }
-      }
-    }
-    stage('Verify with same setting'){
-      steps{
-        def build_run = build job: 'indy-playground', propagate: true, wait: true, parameters: [string(name: 'INDY_GIT_BRANCH', value: "${params.INDY_GIT_BRANCH}"),
-        string(name: 'INDY_GIT_REPO', value: "${params.INDY_GIT_REPO}"),
-        string(name: 'INDY_MAJOR_VERSION', value: "${params.INDY_MAJOR_VERSION}"),
-        string(name: 'INDY_DEV_IMAGE_TAG', value: "latest"),
-        booleanParam(name: 'TAG_INTO_IMAGESTREAM', value: true),
-        booleanParam(name: 'INDY_PREPARE_RELEASE', value: true),
-        booleanParam(name: 'FUNCTIONAL_TEST', value: true),
-        booleanParam(name: 'STRESS_TEST', value: true),
-        string(name: 'QUAY_IMAGE_TAG', value: 'latest')
-        ]
-        env.DOWNSTREAM_URL = build_run.absoluteUrl
       }
     }
     stage('Setup and Formating'){
@@ -103,17 +88,17 @@ pipeline {
             usernamePassword(credentialsId:'OSS-Nexus-Bot', passwordVariable:'OSS_BOT_PASSWORD', usernameVariable:'OSS_BOT_USERNAME'),
             string(credentialsId: 'gnupg_passphrase', variable: 'PASSPHRASE')
           ]) {
-            dir('indy'){
-              sh """#!/bin/bash
+            dir(params.LIB_NAME){
+              sh """
               git config --global user.email "${params.BOT_EMAIL}"
               git config --global user.name "${BOT_USERNAME}"
               mvn -B -s ../settings.xml -Pformatting clean install
               git commit -a, "Update license header"                #commit nothing when there is no file needs to be modified
-              git push https://${BOT_USERNAME}:${BOT_PASSWORD}@$`python3 -c 'print("${params.INDY_GIT_REPO}".split("//")[1])'` --all
+              git push https://${BOT_USERNAME}:${BOT_PASSWORD}@$`python3 -c 'print("${params.LIB_GIT_REPO}".split("//")[1])'` --all
               cp ../settings-release.xml /home/jenkins/.m2/settings.xml
+              sed -i 's/{{_PASSPHRASE}}/${PASSPHRASE}/g' /home/jenkins/.m2/settings.xml
               sed -i 's/{{_USERNAME}}/${OSS_BOT_USERNAME}/g' /home/jenkins/.m2/settings.xml
               sed -i 's/{{_PASSWORD}}/${OSS_BOT_PASSWORD}/g' /home/jenkins/.m2/settings.xml
-              sed -i 's/{{_PASSPHRASE}}/${PASSPHRASE}/g' /home/jenkins/.m2/settings.xml
               """
             }
           }
@@ -123,16 +108,16 @@ pipeline {
     stage('Release Prepare'){
       steps{
         script{
-          dir('indy'){
-            env.INDY_NEXT_VERSION = sh (
+          dir(params.LIB_NAME){
+            env.LIB_NEXT_VERSION = sh (
               script: """
-                echo ${params.INDY_MAJOR_VERSION} | awk -F. -v OFS=. 'NF==1{print ++$NF}; NF>1{if(length($NF+1)>length($NF))$(NF-1)++; $NF=sprintf("%0*d", length($NF), ($NF+1)%(10^length($NF))); print}'
+                echo ${params.LIB_MAJOR_VERSION} | awk -F. -v OFS=. 'NF==1{print ++$NF}; NF>1{if(length($NF+1)>length($NF))$(NF-1)++; $NF=sprintf("%0*d", length($NF), ($NF+1)%(10^length($NF))); print}'
                 """
               returnStdout: true
             )
             sh """#!/bin/bash
             mvn help:effective-settings
-            mvn --batch-mode release:prepare -DreleaseVersion=${params.INDY_MAJOR_VERSION} -DdevelopmentVersion=${env.INDY_NEXT_VERSION}-SNAPSHOT -Dtag=indy-parent-${params.INDY_MAJOR_VERSION}
+            mvn --batch-mode release:prepare -DreleaseVersion=${params.LIB_MAJOR_VERSION} -DdevelopmentVersion=${env.LIB_NEXT_VERSION}-SNAPSHOT -Dtag=indy-parent-${params.LIB_MAJOR_VERSION}
             """
           }
         }
@@ -141,7 +126,7 @@ pipeline {
     stage('Release performing'){
       steps{
         script{
-          dir('indy'){
+          dir(params.LIB_NAME){
             sh """
             mvn --batch-mode release:perform
             """
@@ -151,6 +136,28 @@ pipeline {
     }
   }
   post {
+    cleanup {
+      script{
+        if (params.INDY_GIT_BRANCH == 'release' || params.INDY_PREPARE_RELEASE == true){
+          try{
+            sh """
+            curl -X DELETE "http://indy-infra-nos-automation.cloud.paas.psi.redhat.com/api/admin/stores/maven/hosted/${params.INDY_MAJOR_VERSION}-jenkins-${env.BUILD_NUMBER}" -H "accept: application/json"
+            """
+          }catch(e){
+            echo "Error teardown hosted repo"
+          }
+        }
+        if (env.RESULTING_TAG) {
+          echo "Removing tag ${env.RESULTING_TAG} from the ImageStream..."
+          openshift.withCluster() {
+            openshift.withProject("${params.INDY_IMAGESTREAM_NAMESPACE}") {
+              openshift.tag("${params.INDY_IMAGESTREAM_NAME}:${env.RESULTING_TAG}",
+                "-d")
+            }
+          }
+        }
+      }
+    }
     success {
       script {
         echo "SUCCEED"
@@ -158,18 +165,11 @@ pipeline {
     }
     failure {
       script {
-        dir('indy'){
-          sh 'git reset --hard'
-          env.INDY_SNAPSHOT_DEPENDENCY = sh (
-                  script: 'mvn -s ../settings.xml dependency:tree -Dincludes=:::*-SNAPSHOT | grep -v -e Downloaded -e Progress -e Downloading -e indy -e Indy -e "\\[ERROR\\]" -e "\\[\\ pom\\ \\]" -e "\\[\\ jar\\ \\]"',
-                  returnStdout: true
-            ).trim()
-          if (params.MAIL_ADDRESS){
-            try {
-              sendBuildStatusEmail('failed')
-            } catch (e) {
-              echo "Error sending email: ${e}"
-            }
+        if (params.MAIL_ADDRESS){
+          try {
+            sendBuildStatusEmail('failed')
+          } catch (e) {
+            echo "Error sending email: ${e}"
           }
         }
       }
@@ -181,9 +181,6 @@ def sendBuildStatusEmail(String status) {
   def recipient = params.MAIL_ADDRESS
   def subject = "Jenkins job ${env.JOB_NAME} #${env.BUILD_NUMBER} ${status}."
   def body = "Build URL: ${env.BUILD_URL}"
-  if (env.INDY_SNAPSHOT_DEPENDENCY) {
-    body += "\nFound snapshot release depenency: \n ${INDY_SNAPSHOT_DEPENDENCY}"
-  }
   if (env.PR_NO) {
     subject = "Jenkins job ${env.JOB_NAME}, PR #${env.PR_NO} ${status}."
     body += "\nPull Request: ${env.PR_URL}"

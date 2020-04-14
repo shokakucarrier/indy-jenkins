@@ -1,0 +1,22 @@
+<settings xmlns="http://maven.apache.org/SETTINGS/1.1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.1.0 http://maven.apache.org/xsd/settings-1.1.0.xsd">
+  <localRepository>/Users/gustavjulienne/.m2/repository</localRepository>
+  <pluginGroups>
+    <pluginGroup>org.apache.maven.plugins</pluginGroup>
+    <pluginGroup>org.codehaus.mojo</pluginGroup>
+  </pluginGroups>
+  <servers>
+    <server>
+      <id>sonatype-nexus-staging</id>
+      <username>{{_USERNAME}}</username>
+      <password>{{_PASSWORD}}</password>
+    </server>
+  </servers>
+  <profiles>
+      <profile>
+      <id>gpg</id>
+      <properties>
+        <gpg.passphrase>{{_PASSPHRASE}}</gpg.passphrase>
+      </properties>
+    </profile>
+  </profiles>
+</settings>
