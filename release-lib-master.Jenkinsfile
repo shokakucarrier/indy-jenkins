@@ -25,11 +25,11 @@ pipeline {
             value: /home/jenkins
           resources:
             requests:
-              memory: 1Gi
-              cpu: 1000m
+              memory: 4Gi
+              cpu: 2000m
             limits:
-              memory: 1Gi
-              cpu: 1000m
+              memory: 4Gi
+              cpu: 2000m
           volumeMounts:
           - mountPath: /home/jenkins/sonatype
             name: volume-0
@@ -44,9 +44,9 @@ pipeline {
             defaultMode: 420
             secretName: sonatype-secrets
         - name: volume-1
-          configMap:
+          secret:
             defaultMode: 420
-            name: gnupg
+            secretName: gnupg
         - name: volume-2
           configMap:
             defaultMode: 420
@@ -90,16 +90,23 @@ pipeline {
           ]) {
             dir(params.LIB_NAME){
               sh """
-              git config --global user.email "${params.BOT_EMAIL}"
-              git config --global user.name "${BOT_USERNAME}"
-              mvn -B -s ../settings.xml -Pformatting clean install
-              git commit -a, "Update license header"                #commit nothing when there is no file needs to be modified
-              git push https://${BOT_USERNAME}:${BOT_PASSWORD}@$`python3 -c 'print("${params.LIB_GIT_REPO}".split("//")[1])'` --all
+              mkdir -p /home/jenkins/.m2
               cp ../settings-release.xml /home/jenkins/.m2/settings.xml
               sed -i 's/{{_PASSPHRASE}}/${PASSPHRASE}/g' /home/jenkins/.m2/settings.xml
               sed -i 's/{{_USERNAME}}/${OSS_BOT_USERNAME}/g' /home/jenkins/.m2/settings.xml
               sed -i 's/{{_PASSWORD}}/${OSS_BOT_PASSWORD}/g' /home/jenkins/.m2/settings.xml
+              sed -i s,git@github.com:Commonjava/indy.git,https://`python3 -c 'print("${params.LIB_GIT_REPO}".split("//")[1])'`,g pom.xml
+              sed -i s,https://github.com/Commonjava/indy.git,https://`python3 -c 'print("${params.LIB_GIT_REPO}".split("//")[1])'`,g pom.xml
+              git config --global user.email "${params.BOT_EMAIL}"
+              git config --global user.name "${BOT_USERNAME}"
+              mvn -B -s ../settings.xml -Pformatting clean install
               """
+              catchError(buildResult: 'SUCCESS', stageResult: 'SUCCESS') {
+                    sh """
+                      git commit -am "Update license header"                #commit nothing when there is no file needs to be modified
+                      git push https://${BOT_USERNAME}:${BOT_PASSWORD}@`python3 -c 'print("${params.LIB_GIT_REPO}".split("//")[1])'` --all
+                    """
+              }
             }
           }
         }
@@ -108,17 +115,19 @@ pipeline {
     stage('Release Prepare'){
       steps{
         script{
-          dir(params.LIB_NAME){
-            env.LIB_NEXT_VERSION = sh (
-              script: """
-                echo ${params.LIB_MAJOR_VERSION} | awk -F. -v OFS=. 'NF==1{print ++$NF}; NF>1{if(length($NF+1)>length($NF))$(NF-1)++; $NF=sprintf("%0*d", length($NF), ($NF+1)%(10^length($NF))); print}'
-                """
-              returnStdout: true
-            )
-            sh """#!/bin/bash
-            mvn help:effective-settings
-            mvn --batch-mode release:prepare -DreleaseVersion=${params.LIB_MAJOR_VERSION} -DdevelopmentVersion=${env.LIB_NEXT_VERSION}-SNAPSHOT -Dtag=indy-parent-${params.LIB_MAJOR_VERSION}
-            """
+          withCredentials([
+            usernamePassword(credentialsId:'GitHub-Bot', passwordVariable:'BOT_PASSWORD', usernameVariable:'BOT_USERNAME')
+          ]){
+            dir('indy'){
+              env.LIB_NEXT_VERSION = sh (
+                script: """ echo ${params.LIB_MAJOR_VERSION} | awk -F. -v OFS=. 'NF==1{print ++\$NF}; NF>1{if(length(\$NF+1)>length(\$NF))\$(NF-1)++; \$NF=sprintf("%0*d", length(\$NF), (\$NF+1)%(10^length(\$NF))); print}' """,
+                returnStdout: true
+              ).trim()
+              sh """
+              mvn help:effective-settings
+              mvn --batch-mode release:prepare -DreleaseVersion=${params.LIB_MAJOR_VERSION} -DdevelopmentVersion=${env.LIB_NEXT_VERSION}-SNAPSHOT -Dtag=indy-parent-${params.LIB_MAJOR_VERSION} -Dusername=${BOT_USERNAME} -Dpassword=${BOT_PASSWORD}
+              """
+            }
           }
         }
       }
@@ -136,28 +145,6 @@ pipeline {
     }
   }
   post {
-    cleanup {
-      script{
-        if (params.INDY_GIT_BRANCH == 'release' || params.INDY_PREPARE_RELEASE == true){
-          try{
-            sh """
-            curl -X DELETE "http://indy-infra-nos-automation.cloud.paas.psi.redhat.com/api/admin/stores/maven/hosted/${params.INDY_MAJOR_VERSION}-jenkins-${env.BUILD_NUMBER}" -H "accept: application/json"
-            """
-          }catch(e){
-            echo "Error teardown hosted repo"
-          }
-        }
-        if (env.RESULTING_TAG) {
-          echo "Removing tag ${env.RESULTING_TAG} from the ImageStream..."
-          openshift.withCluster() {
-            openshift.withProject("${params.INDY_IMAGESTREAM_NAMESPACE}") {
-              openshift.tag("${params.INDY_IMAGESTREAM_NAME}:${env.RESULTING_TAG}",
-                "-d")
-            }
-          }
-        }
-      }
-    }
     success {
       script {
         echo "SUCCEED"

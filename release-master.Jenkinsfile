@@ -25,11 +25,11 @@ pipeline {
             value: /home/jenkins
           resources:
             requests:
-              memory: 1Gi
-              cpu: 1000m
+              memory: 4Gi
+              cpu: 2000m
             limits:
-              memory: 1Gi
-              cpu: 1000m
+              memory: 4Gi
+              cpu: 2000m
           volumeMounts:
           - mountPath: /home/jenkins/sonatype
             name: volume-0
@@ -44,9 +44,9 @@ pipeline {
             defaultMode: 420
             secretName: sonatype-secrets
         - name: volume-1
-          configMap:
+          secret:
             defaultMode: 420
-            name: gnupg
+            secretName: gnupg
         - name: volume-2
           configMap:
             defaultMode: 420
@@ -56,7 +56,7 @@ pipeline {
   }
   options {
     //timestamps()
-    timeout(time: 120, unit: 'MINUTES')
+    timeout(time: 180, unit: 'MINUTES')
   }
   environment {
     PIPELINE_NAMESPACE = readFile('/run/secrets/kubernetes.io/serviceaccount/namespace').trim()
@@ -72,7 +72,7 @@ pipeline {
 
           echo "Prepare the release of ${params.INDY_GIT_REPO} branch: ${params.INDY_GIT_BRANCH}"
 
-          sh """#!/bin/bash
+          sh """
           cd indy
           git checkout ${params.INDY_GIT_BRANCH}
           gpg --allow-secret-key-import --import /home/jenkins/gnupg_keys/private_key.txt
@@ -81,8 +81,13 @@ pipeline {
       }
     }
     stage('Verify with same setting'){
+      when{
+        expression{
+          return params.SKIP_VERIFICATION != true
+        }
+      }
       steps{
-        def build_run = build job: 'indy-playground', propagate: true, wait: true, parameters: [string(name: 'INDY_GIT_BRANCH', value: "${params.INDY_GIT_BRANCH}"),
+        build job: 'indy-playground', propagate: true, wait: true, parameters: [string(name: 'INDY_GIT_BRANCH', value: "${params.INDY_GIT_BRANCH}"),
         string(name: 'INDY_GIT_REPO', value: "${params.INDY_GIT_REPO}"),
         string(name: 'INDY_MAJOR_VERSION', value: "${params.INDY_MAJOR_VERSION}"),
         string(name: 'INDY_DEV_IMAGE_TAG', value: "latest"),
@@ -92,7 +97,6 @@ pipeline {
         booleanParam(name: 'STRESS_TEST', value: true),
         string(name: 'QUAY_IMAGE_TAG', value: 'latest')
         ]
-        env.DOWNSTREAM_URL = build_run.absoluteUrl
       }
     }
     stage('Setup and Formating'){
@@ -104,17 +108,24 @@ pipeline {
             string(credentialsId: 'gnupg_passphrase', variable: 'PASSPHRASE')
           ]) {
             dir('indy'){
-              sh """#!/bin/bash
-              git config --global user.email "${params.BOT_EMAIL}"
-              git config --global user.name "${BOT_USERNAME}"
-              mvn -B -s ../settings.xml -Pformatting clean install
-              git commit -a, "Update license header"                #commit nothing when there is no file needs to be modified
-              git push https://${BOT_USERNAME}:${BOT_PASSWORD}@$`python3 -c 'print("${params.INDY_GIT_REPO}".split("//")[1])'` --all
+              sh """
+              mkdir -p /home/jenkins/.m2
               cp ../settings-release.xml /home/jenkins/.m2/settings.xml
               sed -i 's/{{_USERNAME}}/${OSS_BOT_USERNAME}/g' /home/jenkins/.m2/settings.xml
               sed -i 's/{{_PASSWORD}}/${OSS_BOT_PASSWORD}/g' /home/jenkins/.m2/settings.xml
-              sed -i 's/{{_PASSPHRASE}}/${PASSPHRASE}/g' /home/jenkins/.m2/settings.xml
+              sed -i 's/{{_PASSPHRASE}}/'${PASSPHRASE}'/g' /home/jenkins/.m2/settings.xml
+              sed -i s,git@github.com:Commonjava/indy.git,https://`python3 -c 'print("${params.INDY_GIT_REPO}".split("//")[1])'`,g pom.xml
+              sed -i s,https://github.com/Commonjava/indy.git,https://`python3 -c 'print("${params.INDY_GIT_REPO}".split("//")[1])'`,g pom.xml
+              git config --global user.email "${params.BOT_EMAIL}"
+              git config --global user.name "${BOT_USERNAME}"
+              mvn -B -s ../settings.xml -Pformatting clean install
               """
+              catchError(buildResult: 'SUCCESS', stageResult: 'SUCCESS') {
+                    sh """
+                      git commit -am "Update license header"                #commit nothing when there is no file needs to be modified
+                      git push https://${BOT_USERNAME}:${BOT_PASSWORD}@`python3 -c 'print("${params.INDY_GIT_REPO}".split("//")[1])'` --all
+                    """
+              }
             }
           }
         }
@@ -123,17 +134,19 @@ pipeline {
     stage('Release Prepare'){
       steps{
         script{
-          dir('indy'){
-            env.INDY_NEXT_VERSION = sh (
-              script: """
-                echo ${params.INDY_MAJOR_VERSION} | awk -F. -v OFS=. 'NF==1{print ++$NF}; NF>1{if(length($NF+1)>length($NF))$(NF-1)++; $NF=sprintf("%0*d", length($NF), ($NF+1)%(10^length($NF))); print}'
-                """
-              returnStdout: true
-            )
-            sh """#!/bin/bash
-            mvn help:effective-settings
-            mvn --batch-mode release:prepare -DreleaseVersion=${params.INDY_MAJOR_VERSION} -DdevelopmentVersion=${env.INDY_NEXT_VERSION}-SNAPSHOT -Dtag=indy-parent-${params.INDY_MAJOR_VERSION}
-            """
+          withCredentials([
+            usernamePassword(credentialsId:'GitHub-Bot', passwordVariable:'BOT_PASSWORD', usernameVariable:'BOT_USERNAME')
+          ]){
+            dir('indy'){
+              env.INDY_NEXT_VERSION = sh (
+                script: """ echo ${params.INDY_MAJOR_VERSION} | awk -F. -v OFS=. 'NF==1{print ++\$NF}; NF>1{if(length(\$NF+1)>length(\$NF))\$(NF-1)++; \$NF=sprintf("%0*d", length(\$NF), (\$NF+1)%(10^length(\$NF))); print}' """,
+                returnStdout: true
+              ).trim()
+              sh """
+              mvn help:effective-settings
+              mvn --batch-mode release:prepare -DreleaseVersion=${params.INDY_MAJOR_VERSION} -DdevelopmentVersion=${env.INDY_NEXT_VERSION}-SNAPSHOT -Dtag=indy-parent-${params.INDY_MAJOR_VERSION} -Dusername=${BOT_USERNAME} -Dpassword=${BOT_PASSWORD}
+              """
+            }
           }
         }
       }
@@ -161,7 +174,7 @@ pipeline {
         dir('indy'){
           sh 'git reset --hard'
           env.INDY_SNAPSHOT_DEPENDENCY = sh (
-                  script: 'mvn -s ../settings.xml dependency:tree -Dincludes=:::*-SNAPSHOT | grep -v -e Downloaded -e Progress -e Downloading -e indy -e Indy -e "\\[ERROR\\]" -e "\\[\\ pom\\ \\]" -e "\\[\\ jar\\ \\]"',
+                  script: 'mvn -s ../settings.xml dependency:tree -Dincludes=:::*-SNAPSHOT | grep SNAPSHOT | grep -v -e Downloaded -e Progress -e Downloading -e indy -e Indy -e "\\[ERROR\\]" -e "\\[\\ pom\\ \\]" -e "\\[\\ jar\\ \\]"',
                   returnStdout: true
             ).trim()
           if (params.MAIL_ADDRESS){
