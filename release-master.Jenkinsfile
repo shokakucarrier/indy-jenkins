@@ -109,17 +109,9 @@ pipeline {
           ]) {
             dir('indy'){
               env.INDY_PMD_VIOLATION = sh (
-                  script: 'mvn -B -s ../settings.xml -Pformatting,cq clean install',
+                  script: 'mvn -B -s ../settings.xml -Pformatting clean install',
                   returnStatus: true
               ) == 0
-              catchError(buildResult: 'SUCCESS', stageResult: 'SUCCESS') {
-                    sh """
-                      git config --global user.email "${params.BOT_EMAIL}"
-                      git config --global user.name "${BOT_USERNAME}"
-                      git commit -am "Update license header"                #commit nothing when there is no file needs to be modified
-                      git push https://${BOT_USERNAME}:${BOT_PASSWORD}@`python3 -c 'print("${params.INDY_GIT_REPO}".split("//")[1])'` --all
-                    """
-              }
               sh """
               mkdir -p /home/jenkins/.m2
               cp ../settings-release.xml /home/jenkins/.m2/settings.xml
@@ -129,6 +121,14 @@ pipeline {
               sed -i s,git@github.com:Commonjava/indy.git,https://`python3 -c 'print("${params.INDY_GIT_REPO}".split("//")[1])'`,g pom.xml
               sed -i s,https://github.com/Commonjava/indy.git,https://`python3 -c 'print("${params.INDY_GIT_REPO}".split("//")[1])'`,g pom.xml
               """
+              catchError(buildResult: 'SUCCESS', stageResult: 'SUCCESS') {
+                    sh """
+                      git config --global user.email "${params.BOT_EMAIL}"
+                      git config --global user.name "${BOT_USERNAME}"
+                      git commit -am "Update license header"                #commit nothing when there is no file needs to be modified
+                      git push https://${BOT_USERNAME}:${BOT_PASSWORD}@`python3 -c 'print("${params.INDY_GIT_REPO}".split("//")[1])'` --all
+                    """
+              }
             }
           }
         }

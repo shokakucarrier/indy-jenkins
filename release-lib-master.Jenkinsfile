@@ -93,6 +93,15 @@ pipeline {
                   script: 'mvn -B -s ../settings.xml -Pformatting,cq clean install',
                   returnStatus: true
               ) == 0
+              sh """
+              mkdir -p /home/jenkins/.m2
+              cp ../settings-release.xml /home/jenkins/.m2/settings.xml
+              sed -i 's/{{_PASSPHRASE}}/${PASSPHRASE}/g' /home/jenkins/.m2/settings.xml
+              sed -i 's/{{_USERNAME}}/${OSS_BOT_USERNAME}/g' /home/jenkins/.m2/settings.xml
+              sed -i 's/{{_PASSWORD}}/${OSS_BOT_PASSWORD}/g' /home/jenkins/.m2/settings.xml
+              sed -i s,git@github.com:Commonjava/${params.LIB_NAME}.git,https://`python3 -c 'print("${params.LIB_GIT_REPO}".split("//")[1])'`,g pom.xml
+              sed -i s,https://github.com/Commonjava/${params.LIB_NAME}.git,https://`python3 -c 'print("${params.LIB_GIT_REPO}".split("//")[1])'`,g pom.xml
+              """
               catchError(buildResult: 'SUCCESS', stageResult: 'SUCCESS') {
                     sh """
                     git config --global user.email "${params.BOT_EMAIL}"
@@ -101,15 +110,6 @@ pipeline {
                     git push https://${BOT_USERNAME}:${BOT_PASSWORD}@`python3 -c 'print("${params.LIB_GIT_REPO}".split("//")[1])'` --all
                     """
               }
-              sh """
-              mkdir -p /home/jenkins/.m2
-              cp ../settings-release.xml /home/jenkins/.m2/settings.xml
-              sed -i 's/{{_PASSPHRASE}}/${PASSPHRASE}/g' /home/jenkins/.m2/settings.xml
-              sed -i 's/{{_USERNAME}}/${OSS_BOT_USERNAME}/g' /home/jenkins/.m2/settings.xml
-              sed -i 's/{{_PASSWORD}}/${OSS_BOT_PASSWORD}/g' /home/jenkins/.m2/settings.xml
-              sed -i s,git@github.com:Commonjava/indy.git,https://`python3 -c 'print("${params.LIB_GIT_REPO}".split("//")[1])'`,g pom.xml
-              sed -i s,https://github.com/Commonjava/indy.git,https://`python3 -c 'print("${params.LIB_GIT_REPO}".split("//")[1])'`,g pom.xml
-              """
             }
           }
         }
