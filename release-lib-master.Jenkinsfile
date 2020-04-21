@@ -90,7 +90,7 @@ pipeline {
           ]) {
             dir(params.LIB_NAME){
               env.LIB_PMD_VIOLATION = sh (
-                  script: 'mvn -B -s ../settings.xml -Pformatting,cq clean install'
+                  script: 'mvn -B -s ../settings.xml -Pformatting,cq clean install',
                   returnStatus: true
               ) == 0
               catchError(buildResult: 'SUCCESS', stageResult: 'SUCCESS') {

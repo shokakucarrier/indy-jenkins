@@ -109,7 +109,7 @@ pipeline {
           ]) {
             dir('indy'){
               env.INDY_PMD_VIOLATION = sh (
-                  script: 'mvn -B -s ../settings.xml -Pformatting,cq clean install'
+                  script: 'mvn -B -s ../settings.xml -Pformatting,cq clean install',
                   returnStatus: true
               ) == 0
               catchError(buildResult: 'SUCCESS', stageResult: 'SUCCESS') {
