@@ -89,6 +89,18 @@ pipeline {
             string(credentialsId: 'gnupg_passphrase', variable: 'PASSPHRASE')
           ]) {
             dir(params.LIB_NAME){
+              env.LIB_PMD_VIOLATION = sh (
+                  script: 'mvn -B -s ../settings.xml -Pformatting,cq clean install'
+                  returnStatus: true
+              ) == 0
+              catchError(buildResult: 'SUCCESS', stageResult: 'SUCCESS') {
+                    sh """
+                    git config --global user.email "${params.BOT_EMAIL}"
+                    git config --global user.name "${BOT_USERNAME}"
+                    git commit -am "Update license header"                #commit nothing when there is no file needs to be modified
+                    git push https://${BOT_USERNAME}:${BOT_PASSWORD}@`python3 -c 'print("${params.LIB_GIT_REPO}".split("//")[1])'` --all
+                    """
+              }
               sh """
               mkdir -p /home/jenkins/.m2
               cp ../settings-release.xml /home/jenkins/.m2/settings.xml
@@ -97,16 +109,7 @@ pipeline {
               sed -i 's/{{_PASSWORD}}/${OSS_BOT_PASSWORD}/g' /home/jenkins/.m2/settings.xml
               sed -i s,git@github.com:Commonjava/indy.git,https://`python3 -c 'print("${params.LIB_GIT_REPO}".split("//")[1])'`,g pom.xml
               sed -i s,https://github.com/Commonjava/indy.git,https://`python3 -c 'print("${params.LIB_GIT_REPO}".split("//")[1])'`,g pom.xml
-              git config --global user.email "${params.BOT_EMAIL}"
-              git config --global user.name "${BOT_USERNAME}"
-              mvn -B -s ../settings.xml -Pformatting clean install
               """
-              catchError(buildResult: 'SUCCESS', stageResult: 'SUCCESS') {
-                    sh """
-                      git commit -am "Update license header"                #commit nothing when there is no file needs to be modified
-                      git push https://${BOT_USERNAME}:${BOT_PASSWORD}@`python3 -c 'print("${params.LIB_GIT_REPO}".split("//")[1])'` --all
-                    """
-              }
             }
           }
         }
@@ -171,6 +174,9 @@ def sendBuildStatusEmail(String status) {
   if (env.PR_NO) {
     subject = "Jenkins job ${env.JOB_NAME}, PR #${env.PR_NO} ${status}."
     body += "\nPull Request: ${env.PR_URL}"
+  }
+  if (!env.INDY_PMD_VIOLATION){
+    body += "\nFound code PMD Violations; please check"
   }
   emailext to: recipient, subject: subject, body: body
 }
