@@ -84,7 +84,7 @@ pipeline {
       steps{
         script{
           withCredentials([
-            usernamePassword(credentialsId:'GitHub-Bot', passwordVariable:'BOT_PASSWORD', usernameVariable:'BOT_USERNAME'),
+            usernamePassword(credentialsId:'GitHub_Bot', passwordVariable:'BOT_PASSWORD', usernameVariable:'BOT_USERNAME'),
             usernamePassword(credentialsId:'OSS-Nexus-Bot', passwordVariable:'OSS_BOT_PASSWORD', usernameVariable:'OSS_BOT_USERNAME'),
             string(credentialsId: 'gnupg_passphrase', variable: 'PASSPHRASE')
           ]) {
@@ -119,9 +119,9 @@ pipeline {
       steps{
         script{
           withCredentials([
-            usernamePassword(credentialsId:'GitHub-Bot', passwordVariable:'BOT_PASSWORD', usernameVariable:'BOT_USERNAME')
+            usernamePassword(credentialsId:'GitHub_Bot', passwordVariable:'BOT_PASSWORD', usernameVariable:'BOT_USERNAME')
           ]){
-            dir('indy'){
+            dir(params.LIB_NAME){
               env.LIB_NEXT_VERSION = sh (
                 script: """ echo ${params.LIB_MAJOR_VERSION} | awk -F. -v OFS=. 'NF==1{print ++\$NF}; NF>1{if(length(\$NF+1)>length(\$NF))\$(NF-1)++; \$NF=sprintf("%0*d", length(\$NF), (\$NF+1)%(10^length(\$NF))); print}' """,
                 returnStdout: true
