@@ -42,14 +42,14 @@
 
       <properties>
         <altReleaseDeploymentRepository>
-          indy::default::http://indy-infra-spmm-automation.cloud.paas.psi.redhat.com/api/folo/track/{{_BUILD_ID}}/maven/hosted/{{_BUILD_ID}}
+          indy::default::http://indy-infra.spmm-automation.svc.cluster.local/api/folo/track/{{_BUILD_ID}}/maven/hosted/{{_BUILD_ID}}
         </altReleaseDeploymentRepository>
         <altSnapshotDeploymentRepository>
-          indy::default::http://indy-infra-spmm-automation.cloud.paas.psi.redhat.com/api/content/maven/hosted/local-deployments
+          indy::default::http://indy-infra.spmm-automation.svc.cluster.local/api/content/maven/hosted/local-deployments
         </altSnapshotDeploymentRepository>
         <!-- NOTE: For older plugin versions ONLY...disabled here
         <altDeploymentRepository>
-          indy::default::http://indy-infra-spmm-automation.cloud.paas.psi.redhat.com/api/content/maven/hosted/local-releases
+          indy::default::http://indy-infra-spmm-automation.svc.cluster.local/api/content/maven/hosted/local-releases
         </altDeploymentRepository>
          -->
       </properties>
