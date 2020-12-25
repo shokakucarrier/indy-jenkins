@@ -121,7 +121,7 @@ pipeline {
       steps{
         dir("indy"){
           echo "Executing build for : ${params.INDY_GIT_REPO} ${params.INDY_MAJOR_VERSION}"
-          sh "mvn -B -V clean verify -DskipNpmConfig=false"
+          sh "mvn -B -V clean verify -DskipNpmConfig=false --global-toolchains toolchains.xml"
         }
       }
     }
@@ -140,7 +140,7 @@ pipeline {
       }
       steps {
         dir("indy"){
-          sh 'mvn -B -V verify -Prun-its -Pci -DskipNpmConfig=false'
+          sh 'mvn -B -V verify -Prun-its -Pci -DskipNpmConfig=false --global-toolchains toolchains.xml'
         }
       }
     }
@@ -281,7 +281,7 @@ pipeline {
         dir("indy"){
           script{
             sh """
-            mvn help:effective-settings -B -V -DskipTests=true -DskipNpmConfig=false deploy -e
+            mvn help:effective-settings -B -V -DskipTests=true -DskipNpmConfig=false deploy -e --global-toolchains toolchains.xml
             """
             if (params.INDY_GIT_BRANCH == 'release'){
               sh """
