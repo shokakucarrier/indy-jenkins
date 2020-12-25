@@ -38,6 +38,8 @@ pipeline {
           - name: HOME
             value: /home/jenkins
           - name: JAVA_HOME
+            value: /usr/lib/jvm/java-1.8.0-openjdk
+          - name: JAVA_11_HOME
             value: /usr/lib/jvm/java-11-openjdk
           resources:
             requests:
@@ -121,11 +123,9 @@ pipeline {
     }
     stage('Build'){
       steps{
-        withEnv(['JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk']){
-          dir("indy"){
-            echo "Executing build for : ${params.INDY_GIT_REPO} ${params.INDY_MAJOR_VERSION}"
-            sh "mvn -B -V clean verify -DskipNpmConfig=false --global-toolchains toolchains.xml"
-          }
+        dir("indy"){
+          echo "Executing build for : ${params.INDY_GIT_REPO} ${params.INDY_MAJOR_VERSION}"
+          sh "mvn -B -V clean verify -DskipNpmConfig=false --global-toolchains toolchains.xml"
         }
       }
     }
@@ -143,10 +143,8 @@ pipeline {
         }
       }
       steps {
-        withEnv(['JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk']){
-          dir("indy"){
-            sh 'mvn -B -V verify -Prun-its -Pci -DskipNpmConfig=false --global-toolchains toolchains.xml'
-          }
+        dir("indy"){
+          sh 'mvn -B -V verify -Prun-its -Pci -DskipNpmConfig=false --global-toolchains toolchains.xml'
         }
       }
     }
@@ -284,17 +282,15 @@ pipeline {
         }
       }
       steps {
-        withEnv(['JAVA_HOME=/usr/lib/jvm/java-1.8.0-openjdk']){
-          dir("indy"){
-            script{
+        dir("indy"){
+          script{
+            sh """
+            mvn help:effective-settings -B -V -DskipTests=true -DskipNpmConfig=false deploy -e --global-toolchains toolchains.xml
+            """
+            if (params.INDY_GIT_BRANCH == 'release'){
               sh """
-              mvn help:effective-settings -B -V -DskipTests=true -DskipNpmConfig=false deploy -e --global-toolchains toolchains.xml
+              curl -X POST "http://indy-infra-nos-automation.cloud.paas.psi.redhat.com/api/promotion/paths/promote" -H "accept: application/json" -H "Content-Type: application/json" -d "{\\"source\\": \\"maven:hosted:${params.INDY_MAJOR_VERSION}-jenkins-${env.BUILD_NUMBER}\\", \\"target\\": \\"maven:hosted:local-deployments\\"}"
               """
-              if (params.INDY_GIT_BRANCH == 'release'){
-                sh """
-                curl -X POST "http://indy-infra-nos-automation.cloud.paas.psi.redhat.com/api/promotion/paths/promote" -H "accept: application/json" -H "Content-Type: application/json" -d "{\\"source\\": \\"maven:hosted:${params.INDY_MAJOR_VERSION}-jenkins-${env.BUILD_NUMBER}\\", \\"target\\": \\"maven:hosted:local-deployments\\"}"
-                """
-              }
             }
           }
         }
