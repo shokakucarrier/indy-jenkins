@@ -18,7 +18,7 @@ pipeline {
       spec:
         containers:
         - name: jnlp
-          image: registry.redhat.io/openshift3/jenkins-agent-maven-35-rhel7:v3.11.219-1
+          image: registry.redhat.io/openshift3/jenkins-agent-maven-35-rhel7:v3.11.286-1
           imagePullPolicy: Always
           tty: true
           env:
@@ -37,6 +37,8 @@ pipeline {
                 name: img-build-hooks-secrets
           - name: HOME
             value: /home/jenkins
+          - name: JAVA_HOME
+            value: /usr/lib/jvm/java-11-openjdk
           resources:
             requests:
               memory: 4Gi
