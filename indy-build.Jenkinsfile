@@ -24,10 +24,6 @@ pipeline {
           env:
           - name: NPMREGISTRY
             value: 'https://repository.engineering.redhat.com/nexus/repository/registry.npmjs.org'
-          - name: JAVA_TOOL_OPTIONS
-            value: '-XX:+UnlockExperimentalVMOptions -Dsun.zip.disableMemoryMapping=true -Xms1024m -Xmx4g'
-          - name: MAVEN_OPTS
-            value: '-Xmx8g -Xms1024m -XX:MaxPermSize=512m -Xss8m'
           - name: USER
             value: 'jenkins-k8s-config'
           - name: IMG_BUILD_HOOKS
